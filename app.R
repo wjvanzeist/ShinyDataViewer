@@ -171,7 +171,7 @@ if(dir.exists("../data_files")){datapath="../data_files"}else{datapath="./"}
 dir.create("../output_plots", showWarnings = FALSE)
 csv_filenames <- list.files(path=datapath, pattern = "\\.csv$")
 rda_filenames <- list.files(path=datapath, pattern = "\\.rda$")
-ini_filenames <- list.files(pattern = "\\.ini$")
+ini_filenames <- list.files(path="./settings/", pattern = "\\.ini$")
 color_ssp <- c("#00FF00","#0000FF","#FF0000","#FFB900","#FF00FF")
 color_decomp <- c("#FFCC00", "#C0504D", "#9BBB59", "#8064A2", "#4BC0C6", "#F79646") #, "#797A7A", "#376092")
 color_sspland1 <- c('#b2df8a','#33a02c','#6a3d9a','#fdbf6f','#ff7f00','#1f78b4','#e31a1c')
@@ -192,7 +192,7 @@ ui <- fluidPage(
                  fileInput('file1', 'Choose CSV File to upload (multiple files of same format are possible)',
                            accept = c('text/csv', 'text/comma-separated-values,text/plain', '.csv', '.rda'), multiple = TRUE),
                  selectInput("dataset",label = "Choose Dataset", choices = c(rda_filenames, csv_filenames), selected = "Combined_yield_data.csv"),
-                 selectInput("settings_opt",label = "Choose settings", choices = c("None", ini_filenames), selected = "default_settings.ini"),
+                 selectInput("settings_opt",label = "Choose settings", choices = c("None", ini_filenames), selected = "None"),
                  actionButton('update_settings', 'Force update settings')
         ),
         tabPanel("Main",
@@ -229,8 +229,8 @@ ui <- fluidPage(
                  checkboxInput('summary', 'Summary in line chart?', value=FALSE),
                  checkboxInput('ribbon', 'Ribbon in line chart?', value=FALSE),
                  selectInput("scales", label = "Scales for multiple charts:", choices=c("free_y", "free_x","free", "fixed"), selected = "free"),
-                 numericInput('ChartHeight', 'Chart height (pixels)', min=1, max=10000, value=400, step=10, round=0),
-                 numericInput('ChartWidth', 'Chart widht (pixels)', min=1, max=10000, value=500, step=10, round=0),
+                 numericInput('ChartHeight', 'Chart height (pixels)', min=1, max=10000, value=400),
+                 numericInput('ChartWidth', 'Chart widht (pixels)', min=1, max=10000, value=500),
                  checkboxInput('aspect_opt', "force aspect ratio?", value = FALSE),
                  numericInput('aspect_ratio', 'If selected: Aspect ratio (height/width)', min=0.1, max=5, value=4/5, step = 0.1),
                  sliderInput('TextSize', 'Text size adjustment', min=-10, max=10, value=-2, step=1, round=0),
@@ -289,7 +289,7 @@ ui <- fluidPage(
                   #G1 = G1 + scale_y_continuous(breaks=seq(-1000,1000,200),limits=c(-1100,1100))", width="800px", height="400px")
         ),
         tabPanel("Settings",
-                 downloadButton('saveInputs', 'Save settings for re-use later (put in main app folder)'),
+                 downloadButton('saveInputs', 'Save settings for re-use later (put in settings folder)'),
                  tableOutput('show_inputs')
         )
       )
@@ -981,7 +981,7 @@ server <- function(input, output, session) {
   
   settings_list <- reactive({
     if (exists("input")) {
-      settings_list <- as.data.frame(read.csv(input$settings_opt, sep=",", dec="."))
+      settings_list <- as.data.frame(read.csv(paste("./settings/",input$settings_opt, sep=""), sep=",", dec="."))
     }
   })
   
