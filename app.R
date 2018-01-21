@@ -4,30 +4,16 @@
 #
 
 # Libraries ---------------------------------------------------------------
+library(ggplot2)
+library(tools)
 library(reshape)
 library(reshape2)
-library(ggplot2)
-library(plyr)
-library(tools)
-# Required packages to run script
 library(plyr)
 library(dplyr)
-library(rmarkdown)
 library(data.table)
 library(knitr)
 library(tidyr)
-# Plotting packages
-library(grid)
-#library(gridExtra)
 library(colourpicker)
-library(scales)  
-#library(shinyjqui)
-#library(leaflet)
-library(maps)
-library(mapdata)
-library(maptools)
-# Project library
-# source("WJlib.R")
 
 # ---- Functions
 scenario_range <- function(df, yr) {  
