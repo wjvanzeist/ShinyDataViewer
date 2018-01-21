@@ -14,7 +14,6 @@ library(data.table)
 library(knitr)
 library(tidyr)
 library(colourpicker)
-#testing
 
 # ---- Functions
 scenario_range <- function(df, yr) {  
