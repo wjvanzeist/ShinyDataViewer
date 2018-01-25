@@ -181,32 +181,29 @@ ui <- fluidPage(
                  selectInput("settings_opt",label = "Choose settings", choices = c("None", ini_filenames), selected = "None"),
                  actionButton('update_settings', 'Force update settings')
         ),
-        tabPanel("Main",
-               tabsetPanel(
-                 tabPanel("All",
-                          p('Selection will influence order of plots. Selection applies to all plots'),
-                          uiOutput("flex_options"),
-                          checkboxInput("factor_xvar", "Make factors out of x axis, necessary for years & bar charts.", value = FALSE)
-                 ),
-                 tabPanel("Line",
-                  checkboxInput("line_chart_active", "Activate line chart:", value=TRUE),
-                  uiOutput("flex_options_line")
-                 ),
-                 tabPanel("Point",
-                  checkboxInput("point_chart_active", "Activate point chart:", value=FALSE),
-                  uiOutput('flex_options_point')
-                 ),
-                 tabPanel("Bar",
-                  checkboxInput("bar_chart_active", "Activate bar chart:", value=FALSE),
-                  uiOutput('flex_options_bar')
-                 ),
-                 tabPanel("Ribbon",
-                  checkboxInput("ribbon_chart_active", "Activate ribbon chart:", value=FALSE),
-                  p("ribbon based on stat_summary function for data seleced below"),
-                  uiOutput('flex_options_ribbon')
-                 )
-               )
-        ),
+         tabPanel("Main",
+                  p('Selection will influence order of plots. Selection applies to all plots'),
+                  uiOutput("flex_options"),
+                  checkboxInput("factor_xvar", "Make factors out of x axis, necessary for years & bar charts.", value = FALSE)
+         ),
+         tabPanel("Line",
+          checkboxInput("line_chart_active", "Activate line chart:", value=TRUE),
+          uiOutput("flex_options_line")
+         ),
+         tabPanel("Point",
+          checkboxInput("point_chart_active", "Activate point chart:", value=FALSE),
+          uiOutput('flex_options_point')
+         ),
+         tabPanel("Bar",
+          checkboxInput("bar_chart_active", "Activate bar chart:", value=FALSE),
+          uiOutput('flex_options_bar')
+         ),
+         tabPanel("Ribbon",
+          checkboxInput("ribbon_chart_active", "Activate ribbon chart:", value=FALSE),
+          p("ribbon based on stat_summary function for data seleced below"),
+          uiOutput('flex_options_ribbon')
+         ),
+        
         tabPanel("More",
                  textInput("title", "Title:", value = ""),
                  textInput("xlab", "Label x-axis", value = ""),
@@ -904,6 +901,7 @@ server <- function(input, output, session) {
     
     G1 <- plot_build(plot_data())
     plot(G1)
+    #ggsave("../output_plots/plot.png")
     
   }, height=heightSize, width=widthSize)
   
