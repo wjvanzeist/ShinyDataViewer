@@ -211,7 +211,6 @@ ui <- fluidPage(
                  textInput("title", "Title:", value = ""),
                  textInput("xlab", "Label x-axis", value = ""),
                  textInput("ylab", "Label y-axis", value = ""),
-                 checkboxInput('flip', 'Flip coordinates'),
                  checkboxInput('summary', 'Summary in line chart?', value=FALSE),
                  checkboxInput('ribbon', 'Ribbon in line chart?', value=FALSE),
                  selectInput("scales", label = "Scales for multiple charts:", choices=c("free_y", "free_x","free", "fixed"), selected = "free"),
@@ -252,6 +251,10 @@ ui <- fluidPage(
                  colourInput("c10","Pick colour 10", value=rainbow(12)[10]),
                  colourInput("c11","Pick colour 11", value=rainbow(12)[11]),
                  colourInput("c12","Pick colour 12", value=rainbow(12)[12])
+        ),
+        tabPanel("Coordinates",
+                 checkboxInput('flip', 'Flip coordinates'),
+                 checkboxInput('polar', 'Use polar coordinate system')
         ),
         tabPanel("AutoPNG",
                  uiOutput("PNGoptions")
@@ -772,11 +775,11 @@ server <- function(input, output, session) {
       G1 <- G1 + scale_y_continuous(labels=percent)
       } 
       
-    if(input$summary & "Scenario" %in% plot_levels()) {
-      scen_range <- scenario_range(df, 2050)
-      G1 = G1 + stat_summary(data = scen_range,geom="linerange", fun.ymax=max, fun.ymin=min, aes_string(colour=input$fill),alpha=0.12,show.legend=FALSE,size=2)
-      G1 = G1 + geom_point(data=scen_range,aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point), size=3) + scale_shape(solid = FALSE) 
-    } 
+    # if(input$summary & "Scenario" %in% plot_levels()) {
+    #   scen_range <- scenario_range(df, 2050)
+    #   G1 = G1 + stat_summary(data = scen_range,geom="linerange", fun.ymax=max, fun.ymin=min, aes_string(colour=input$fill),alpha=0.12,show.legend=FALSE,size=2)
+    #   G1 = G1 + geom_point(data=scen_range,aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point), size=3) + scale_shape(solid = FALSE) 
+    # } 
 
     
     if(input$title!=""){
@@ -880,6 +883,8 @@ server <- function(input, output, session) {
       }
     }
     if(input$flip){G1 <- G1 + coord_flip()}
+    
+    if(input$polar){G1 <- G1 + coord_polar()}
     
     #This adds anything in input$plot_text_add interpreted as parsed formulas
     eval(parse(text=input$plot_text_add))
