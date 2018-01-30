@@ -165,6 +165,8 @@ color_sspland2 <- c('#bebada','#fb8072','#8dd3c7','#80b1d3','#ffffb3')
 
 debug_opt <- FALSE
 
+nr_of_plots <- 5 #Increased the number of plots available, might slow down stuff
+
 ### UI code  ============
 # This main bit 'ui' contains all the frontend bits, defining menu items etc.
 # ===
@@ -172,7 +174,8 @@ debug_opt <- FALSE
 ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
-      tabsetPanel(
+      uiOutput('mycharttabs'),
+      tabsetPanel(id="tabs",
         tabPanel("Presets",
                  p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
                  fileInput('file1', 'Choose CSV File to upload (multiple files of same format are possible)',
@@ -184,25 +187,39 @@ ui <- fluidPage(
          tabPanel("Main",
                   p('Selection will influence order of plots. Selection applies to all plots'),
                   uiOutput("flex_options"),
+                  textInput("label_colour", "Overwrite labels (use ; seperated list", value=""),
                   checkboxInput("factor_xvar", "Make factors out of x axis, necessary for years & bar charts.", value = FALSE)
+                  
          ),
-         tabPanel("Line",
-          checkboxInput("line_chart_active", "Activate line chart:", value=TRUE),
-          uiOutput("flex_options_line")
-         ),
-         tabPanel("Point",
-          checkboxInput("point_chart_active", "Activate point chart:", value=FALSE),
-          uiOutput('flex_options_point')
-         ),
-         tabPanel("Bar",
-          checkboxInput("bar_chart_active", "Activate bar chart:", value=FALSE),
-          uiOutput('flex_options_bar')
-         ),
-         tabPanel("Ribbon",
-          checkboxInput("ribbon_chart_active", "Activate ribbon chart:", value=FALSE),
-          p("ribbon based on stat_summary function for data seleced below"),
-          uiOutput('flex_options_ribbon')
-         ),
+         
+         # tabPanel("Line",
+         #  checkboxInput("line_chart_active", "Activate line chart:", value=TRUE),
+         #  uiOutput("flex_options_line"),
+         #  textInput("label_line", "Overwrite labels (use ; seperated list", value="")
+         # ),
+         
+
+         # tabPanel("Chart1", uiOutput("flex_options_chart1")),
+         # tabPanel("Chart2", uiOutput("flex_options_chart2")),
+         # tabPanel("Chart3", uiOutput("flex_options_chart3")),
+         # tabPanel("Chart4", uiOutput("flex_options_chart4")),
+         # tabPanel("Chart5", uiOutput("flex_options_chart5")),
+         # 
+         # tabPanel("Point",
+         #  checkboxInput("point_chart_active", "Activate point chart:", value=FALSE),
+         #  uiOutput('flex_options_point')
+         # ),
+         # tabPanel("Bar",
+         #  checkboxInput("bar_chart_active", "Activate bar chart:", value=FALSE),
+         #  uiOutput('flex_options_bar'),
+         #  
+         #  
+         # ),
+         # tabPanel("Ribbon",
+         #  checkboxInput("ribbon_chart_active", "Activate ribbon chart:", value=FALSE),
+         #  p("ribbon based on stat_summary function for data seleced below"),
+         #  uiOutput('flex_options_ribbon')
+         # ),
         
         tabPanel("More",
                  textInput("title", "Title:", value = ""),
@@ -229,8 +246,6 @@ ui <- fluidPage(
                  checkboxInput("LegendReverse", label = "Reverse legend order (labels)", value = FALSE),
                  checkboxInput("LegendReverse2", label = "Reverse color order (data)", value = FALSE),
                  checkboxInput("Reverse_x_var", label = "Reverse data order x_var", value = FALSE),
-                 numericInput("barwidth", label = "width of bars", value = 0.8),
-                 numericInput("dodgewidth", label = "dodge width of bars", value = 0.9),
                  selectInput("LegendPosition", label = "Select position of the legend", choices=c("left", "top", "right", "bottom"), selected = "right")
         ),
         tabPanel("Colors",
@@ -252,9 +267,7 @@ ui <- fluidPage(
         tabPanel("Coordinates",
                  checkboxInput('flip', 'Flip coordinates'),
                  checkboxInput('polar', 'Use polar coordinate system')
-        ),
-        tabPanel("AutoPNG",
-                 uiOutput("PNGoptions")
+
         ),
         selected = "Main" #ACtivates main panel
       )
@@ -277,6 +290,9 @@ ui <- fluidPage(
         tabPanel("Settings",
                  downloadButton('saveInputs', 'Save settings for re-use later (put in settings folder)'),
                  tableOutput('show_inputs')
+        ),
+        tabPanel("AutoPNG",
+                 uiOutput("PNGoptions")
         )
       )
     )
@@ -314,7 +330,6 @@ server <- function(input, output, session) {
     } 
    
     
-    
     return(DATA)
   })
   
@@ -322,6 +337,18 @@ server <- function(input, output, session) {
     #returns lists of names which are factors or integers
     colnames(agmip_csv()[!sapply(agmip_csv(), is.numeric) | sapply(agmip_csv(), is.numeric)])
   })
+  
+  output$mycharttabs = renderUI({
+    # myTabs = lapply(paste('Chart', 1:nr_of_plots), tabPanel)
+    # do.call(tabPanel, myTabs)
+    for (i in nr_of_plots:1) {
+      insertTab(inputId="tabs", 
+                tabPanel(paste("Chart", i, sep=""), uiOutput(paste("flex_options_chart", i, sep=""))),
+                target="Main", position="after")
+    }
+  })
+  
+
   
   # Flexible UI options -----
   output$flex_options <- renderUI({
@@ -374,6 +401,44 @@ server <- function(input, output, session) {
     )
     dyn_taglist
   })
+  
+  flex_options <- function(suffix) {
+    
+    dyn_taglist <- tagList()
+    
+    sel = if(suffix==1){"Line"}else{"None"} # setting default
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("chart_", suffix, sep=""), label = "Choose chart type", choices = c("Line","Point","Bar","Stacked bar","Ribbon", "Tornado", "Boxplot", "None"), selected = sel))
+
+    for(i in 1:dim(agmip_csv())[2]) { # looping over column names
+      if (colnames(agmip_csv())[i] %in% plot_levels()) {
+        if (is.integer(agmip_csv()[,i])) { #
+          in_choices <- c("All",unique(agmip_csv()[,i]))
+        } else {
+          in_choices <- c("All",levels(agmip_csv()[,i]))
+        }
+        in_name <- paste(colnames(agmip_csv())[i], "_", suffix, sep="")
+        in_selected <- "All" # Default is all
+        
+        new_input <- div(style="line-height: 0.4;", selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
+        dyn_taglist <- tagAppendChild(dyn_taglist, new_input)
+      }
+    }
+    
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("choice_",suffix,sep=""), label= "Choose chart type by:", choices = colnames(agmip_csv()), "Model"))
+    dyn_taglist <- tagAppendChild(dyn_taglist, textInput(paste("label_",suffix,sep=""), "Overwrite labels (use semicolon seperated list", value=""))
+    dyn_taglist <- tagAppendChild(dyn_taglist, sliderInput(paste('alpha_',suffix,sep=""), 'Alpha', min=0, max=1, value=1, step=0.01))
+    
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("barwidth_", suffix, sep=""), label = "width of bars", value = 0.8))
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("dodgewidth_", suffix, sep=""), label = "dodge width of bars", value = 0.9))
+    
+    dyn_taglist
+  }
+  
+  output$flex_options_chart1 <- renderUI({flex_options(1)})
+  output$flex_options_chart2 <- renderUI({flex_options(2)})
+  output$flex_options_chart3 <- renderUI({flex_options(3)})
+  output$flex_options_chart4 <- renderUI({flex_options(4)})
+  output$flex_options_chart5 <- renderUI({flex_options(5)})
   
   output$flex_options_line <- renderUI({
     
@@ -451,6 +516,8 @@ server <- function(input, output, session) {
         dyn_taglist <- tagAppendChild(dyn_taglist, new_input)
       }
     } 
+    
+#    dyn_taglist <- tagAppendChild(dyn_taglist, checkboxInput("factor_xvar", "Make factors out of x axis, necessary for years & bar charts.", value = FALSE))
     
     dyn_taglist
     
@@ -657,22 +724,6 @@ server <- function(input, output, session) {
   })
   
   # Plot building ====
-  plot_build_line <- function(df) {
-    ss <- df
-    for (i in 1:length(plot_levels())) {
-      # subsets for all plot levels used for input control. 
-      # Double brackets for input needed because it is a reactivevalues class
-      in_name <- paste("line_", plot_levels()[i], sep="")
-      col_name <-plot_levels()[i]
-      if(!("All" %in% input[[in_name]]) & !(is.null(input[[in_name]]))){ss <- subset(ss, ss[,col_name] %in% input[[in_name]])}
-      if(!(in_name == "line_Year")) { # 
-        if(!("All" %in% input[[in_name]]) & !(is.null(input[[in_name]]))){ss[,col_name] <- factor(ss[,col_name], levels=input[[in_name]])}
-      }
-    }
-    G1 = geom_line(data=ss, aes_string(x=input$x_var, y=input$y_var, colour=input$fill, linetype=input$line),size=0.9)
-  
-    return(G1)
-  }
   
   plot_build_point <- function(df) {
     
@@ -691,15 +742,13 @@ server <- function(input, output, session) {
       }   
     }
     
-    G1 = list(geom_point(data=ss, aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point),size=3),
-              scale_shape(solid = FALSE)) 
-    
     return(G1)
   }
   
   plot_build_bar <- function(df) {
     
     ss <- df
+    
     for (i in 1:length(plot_levels())) {
       # subsets for all plot levels used for input control. 
       # Double brackets for input needed because it is a reactivevalues class
@@ -713,10 +762,7 @@ server <- function(input, output, session) {
     }
     
     ss[,input$x_var] <-factor(ss[,input$x_var])
-    G1 = geom_bar(data=ss,
-                       width=input$barwidth,
-                       position=if(input$Chart=="Stacked"){"stack"}else{position_dodge()}, 
-                       stat="identity")
+
     return(G1)
   }
   
@@ -741,19 +787,70 @@ server <- function(input, output, session) {
     return(G1)
   }
   
+  plot_subset <- function(df, suffix){
+    
+    
+    for (i in 1:length(plot_levels())) {
+      # subsets for all plot levels used for input control. 
+      # Double brackets for input needed because it is a reactivevalues class
+      in_name <- paste(plot_levels()[i], "_", suffix, sep="")
+      col_name <- plot_levels()[i]
+      if(!("All" %in% input[[in_name]])){df <- subset(df, df[,col_name] %in% input[[in_name]])}
+    }
+
+    return(df) 
+  }
+  
+  plot_build_suf <- function(G1, df, suffix, chartopt) {
+    
+    choiceopt = input[[paste("choice_", suffix, sep="")]]
+    
+    breaks2 <- levels(df[,choiceopt])
+    if(input$LegendReverse2){breaks2 <- rev(breaks2)}
+    labels_opt = breaks2
+    lbls <- input[[paste("label_", suffix, sep="")]]
+    if (lbls!="" ){
+      lbls <- unlist(strsplit(lbls, ";"))
+      if (length(lbls) == length(breaks2)){
+        labels_opt <- lbls
+      }
+    }
+    
+    if(chartopt=="Line"){
+      G1 = G1 + geom_line(data=df, aes_string(x=input$x_var, y=input$y_var, colour=input$fill, linetype=choiceopt, group=choiceopt),size=0.9)
+      G1 = G1 + scale_linetype(breaks = breaks2, labels=labels_opt)
+    } else if(chartopt=="Point") {
+      G1 = G1 + geom_point(data=df, aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=choiceopt))
+      G1 = G1 + scale_shape(breaks = breaks2, labels=labels_opt)
+    } else if (chartopt=="Bar" | chartopt=="Stacked bar"){
+      G1 = G1 + geom_bar(data=df, width=input[[paste("barwidth_", suffix, sep="")]],
+                                  position=if(input$Chart=="Stacked"){"stack"}else{position_dodge((width=input[[paste("dodgewidth_", suffix, sep="")]]))}, 
+                                  stat="identity")
+    }
+    
+    return(G1)
+  }
+  
   plot_build <- function(df){
     
     if(debug_opt){print("Updating plot_build function")}
     
-    G1 = ggplot(data=df, aes_string(x=input$x_var, y=input$y_var, fill = input$fill))
-    
     if(input$factor_xvar){df[,input$x_var] <-factor(df[,input$x_var])}
-    if(input$line_chart_active){G1 = G1 + plot_build_line(df)}
-    if(input$point_chart_active){G1 = G1 + plot_build_point(df)}
-    if(input$bar_chart_active){G1 = G1 + plot_build_bar(df)}
-    if(input$ribbon_chart_active){
-      G1 = G1 + plot_build_ribbon(df)
+    
+    G1 = ggplot(data=df, aes_string(x=input$x_var, y=input$y_var, fill = input$fill))
+    for (i in 1:nr_of_plots) {
+      chartopt = input[[paste("chart_", i, sep="")]]
+      if(!is.null(chartopt)) {
+        if(chartopt!="None") {
+          G1 = G1 %>% plot_build_suf(plot_subset(df, i), i, chartopt)
+        }
       }
+    }
+    
+    
+    # if(input$point_chart_active){G1 = G1 + plot_build_point(df)}
+    # if(input$bar_chart_active){G1 = G1 + plot_build_bar(df)}
+    # if(input$ribbon_chart_active){G1 = G1 + plot_build_ribbon(df)}
 
     if (input$Chart == "Tornado"){
       tornadata <- spread_(df, input$Tornado, "value")
@@ -776,8 +873,7 @@ server <- function(input, output, session) {
     #   scen_range <- scenario_range(df, 2050)
     #   G1 = G1 + stat_summary(data = scen_range,geom="linerange", fun.ymax=max, fun.ymin=min, aes_string(colour=input$fill),alpha=0.12,show.legend=FALSE,size=2)
     #   G1 = G1 + geom_point(data=scen_range,aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point), size=3) + scale_shape(solid = FALSE) 
-    # } 
-
+    # }
     
     if(input$title!=""){
       titlestring <- unlist(strsplit(input$title, "CO2"))
@@ -818,7 +914,6 @@ server <- function(input, output, session) {
     } 
     
     G1 = G1 +
-      
       theme(
         panel.background = element_rect(fill = 'white', colour = 'black'),
         strip.text = element_text(size=18+input$TextSize),
@@ -844,23 +939,20 @@ server <- function(input, output, session) {
     breaks2 <- levels(df[,input$fill])
     if(input$LegendReverse2){breaks2 <- rev(breaks2)}
     
-    G1 = G1 + scale_color_manual(values=colorset(), breaks = breaks2) + scale_fill_manual(values=colorset(), breaks = breaks2)
+    labels_colour = breaks2
+    if (input$label_colour!="" ){
+      lbls <- unlist(strsplit(input$label_colour, ";"))
+      if (length(lbls) == length(breaks2)){
+        labels_colour <- lbls
+      }
+    }
+    
+    G1 = G1 + scale_color_manual(values=colorset(), breaks = breaks2, labels=labels_colour) 
+    G1 = G1 + scale_fill_manual(values=colorset(), breaks = breaks2)
     # G1 = G1 + theme(legend.position=input$LegendPosition,legend.text = element_text(size=16+input$TextSize),legend.title = element_text(size=16+input$TextSize),legend.box="vertical",legend.box.just="left")
     G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left",
                     legend.text = element_text(size=16+input$TextSize),
                     legend.title = element_text(size=16+input$TextSize))
-    
-    #G1 = G1 + guides(fill = guide_legend(reverse = input$LegendReverse))
-    # theme(panel.background = element_rect(fill = 'grey95', colour = 'black'),
-    #       strip.text = element_text(size=22),
-    #       axis.text.y=element_text(size=20),
-    #       axis.text.x=element_text(size=20,angle = 90),
-    #       axis.ticks.x = element_blank(),
-    #       axis.title.y = element_text(size=18),
-    #       panel.grid.minor=element_blank(),
-    #       panel.grid.major.x=element_blank(),
-    #       panel.grid.major.y = element_line(size=.1, color="grey20"))+
-    # theme(axis.line = element_line(size = 1, colour='gray'))
     
     if (input$xman){G1 <- G1 + xlim(input$xmin, input$xmax)}  
     if (input$yman){G1 <- G1 + ylim(input$ymin, if(input$ymin<input$ymax){input$ymax}else{NA})}
@@ -897,7 +989,6 @@ server <- function(input, output, session) {
       if(debug_opt){print("No plot data (yet)")}
        return(NULL)
     }
-    
     
     G1 <- plot_build(plot_data())
     plot(G1)
