@@ -194,6 +194,7 @@ ui <- fluidPage(
          tabPanel("Labels",
                   textInput("title", "Title:", value = ""),
                   textInput("xlab", "Label x-axis", value = ""),
+                  checkboxInput('xlabrotate', 'Rotate x-axis 90 deg', value = FALSE),
                   textInput("ylab", "Label y-axis", value = ""),
                   textInput("colorlabels", "Overwrite color labels (use semicolon seperated list)", value=""),
                   textInput("filllabels", "Overwrite fill labels", value=""),
@@ -342,6 +343,11 @@ server <- function(input, output, session) {
     dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('shape', 'Shape (for points)', choices = col_options, selected=def_cols[3]))
     dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('fill', 'Fill (for bar, ribbon, etc)', choices = col_options, selected=def_cols[4]))
     
+    dyn_taglist <- tagAppendChildren(dyn_taglist,
+                                     selectInput("x_var", label = "Choose what to use for x axis:", choices = colnames(agmip_csv()),selected = "Year"),
+                                     selectInput("y_var", label = "Choose what to plot on y_axis:", choices = if("index" %in% colnames(agmip_csv())){c("value","index")}else{c("value")}, selected = "value")
+    )
+    
     for(i in 1:dim(agmip_csv())[2]) { # looping over column names
       in_name <- colnames(agmip_csv())[i]
       if (in_name %in% plot_levels()) {
@@ -358,10 +364,6 @@ server <- function(input, output, session) {
       }
     } 
     
-    dyn_taglist <- tagAppendChildren(dyn_taglist,
-              selectInput("x_var", label = "Choose what to use for x axis:", choices = colnames(agmip_csv()),selected = "Year"),
-              selectInput("y_var", label = "Choose what to plot on y_axis:", choices = if("index" %in% colnames(agmip_csv())){c("value","index")}else{c("value")}, selected = "value")
-    )
     dyn_taglist
   })
   
@@ -374,7 +376,11 @@ server <- function(input, output, session) {
 
     for(i in 1:dim(agmip_csv())[2]) { # looping over column names
       if (colnames(agmip_csv())[i] %in% plot_levels()) {
-        in_choices <- c("All",levels(agmip_csv()[,i]))
+        if (is.integer(agmip_csv()[,i])) { #
+          in_choices <- c("All",unique(agmip_csv()[,i]))
+        } else {
+          in_choices <- c("All",levels(agmip_csv()[,i]))
+        }
         in_name <- paste(colnames(agmip_csv())[i], suffix, sep="")
       
         in_selected <- "All" # Default is all
@@ -755,11 +761,10 @@ server <- function(input, output, session) {
     #   G1 = G1 + theme(panel.grid.major.x = element_line(size=.1, color="grey20"))
     # }
     # 
-    # G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left",
-    #                 legend.text = element_text(size=16+input$TextSize),
-    #                 legend.title = element_text(size=16+input$TextSize))
+    G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left")
     
- 
+    if(input$xlabrotate){G1 = G1 + theme(axis.text.x = element_text(angle=90, hjust=1, vjust =0.5))}
+    
    # axis.line =         theme_blank(),
   #  axis.text.x =       theme_text(size = base_size * 0.8 , lineheight = 0.9, colour = "grey50", vjust = 1),
   #  axis.text.y =       theme_text(size = base_size * 0.8, lineheight = 0.9, colour = "grey50", hjust = 1),
@@ -851,9 +856,9 @@ server <- function(input, output, session) {
       }
     } else {
       if("Variable_AgMIP" %in% plot_levels()) {
-        G1 = G1 + ggtitle(unique(df$Variable_AgMIP)[1])
+       # G1 = G1 + ggtitle(unique(df$Variable_AgMIP)[1])
       } else{
-        G1 = G1 + ggtitle(unique(df$Variable)[1])
+       # G1 = G1 + ggtitle(unique(df$Variable)[1])
       }
     }
     
