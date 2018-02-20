@@ -178,8 +178,7 @@ ui <- fluidPage(
       tabsetPanel(id="tabs",
          tabPanel("Main",
                   p('Selection will influence order of plots. Selection applies to all plots'),
-                  uiOutput("flex_options"),
-                  checkboxInput("factor_xvar", "Make factors out of x axis, necessary for years & bar charts.", value = FALSE)
+                  uiOutput("flex_options")
          ),
          tabPanel("Theme",
                   selectInput("themeopt", "select theme:", choices=c("theme_bw", "theme_classic", "theme_dark","theme_gray","theme_light","theme_minimal","theme_void", "Other"), selected="theme_classic"),
@@ -191,7 +190,7 @@ ui <- fluidPage(
                   numericInput("panel.grid.minor.x", "Minor x grid (if>0):", value=0, min=0, step=0.2),
                   numericInput("panel.grid.minor.y", "Minor y grid (if>0):", value=0, min=0, step=0.2)
          ),
-         tabPanel("Labels",
+         tabPanel("Labels & Legend",
                   textInput("title", "Title:", value = ""),
                   textInput("xlab", "Label x-axis", value = ""),
                   checkboxInput('xlabrotate', 'Rotate x-axis 90 deg', value = FALSE),
@@ -199,33 +198,31 @@ ui <- fluidPage(
                   textInput("colorlabels", "Overwrite color labels (use semicolon seperated list)", value=""),
                   textInput("filllabels", "Overwrite fill labels", value=""),
                   textInput("linetypelabels", "Overwrite linetype labels", value=""),
-                  textInput("shapelabels", "Overwrite shape labels", value="")
+                  textInput("shapelabels", "Overwrite shape labels", value=""),
+                  checkboxInput("LegendReverse", label = "Reverse legend order (labels)", value = FALSE),
+                  checkboxInput("LegendReverse2", label = "Reverse color order (data)", value = FALSE),
+                  checkboxInput("Reverse_x_var", label = "Reverse data order x_var", value = FALSE),
+                  selectInput("LegendPosition", label = "Select position of the legend", choices=c("left", "top", "right", "bottom"), selected = "right")
          ),
          tabPanel("Facet",
                   uiOutput("facet_options"),
                   numericInput("ncol", label = "Nr. of colums", value = 2, min=1, step=1),
                   selectInput("scales", label = "Scales for multiple charts:", choices=c("free_y", "free_x","free", "fixed"), selected = "free")
          ),
-        tabPanel("More",
+        tabPanel("Size and scales",
                  #checkboxInput('summary', 'Summary in line chart?', value=FALSE),
+                 checkboxInput("factor_xvar", "Make factors out of x axis, necessary for years & bar charts.", value = FALSE),
                  numericInput('ChartHeight', 'Chart height (pixels)', min=1, max=10000, value=400),
                  numericInput('ChartWidth', 'Chart widht (pixels)', min=1, max=10000, value=500),
                  numericInput('aspect_ratio', 'If >0: Aspect ratio (height/width)', min=0, max=5, value=0, step = 0.25),
-                
-                 selectInput("Scaling", label = "Scale by", choices=c("None", "2005 = 0", "2010 = 0", "index 2010 = 1", "index 2005 = 1")),
                  checkboxInput('yman', 'Manually adjust y range?'),
                  numericInput("ymin", label = "Minimum y", value = 0),
                  numericInput("ymax", label = "Maximum y (if bigger then min)", value = 0),
-                 checkboxInput("grid_y_opt", "Add y grid", value = FALSE),
                  checkboxInput('xman', 'Manually adjust x range?'),
                  numericInput("xmin", label = "Minimum x", value = 2010),
                  numericInput("xmax", label = "Maximum x", value = 2050),
-                 checkboxInput("grid_x_opt", "Add x grid", value = FALSE),
-                 checkboxInput("LegendReverse", label = "Reverse legend order (labels)", value = FALSE),
-                 checkboxInput("LegendReverse2", label = "Reverse color order (data)", value = FALSE),
-                 checkboxInput("Reverse_x_var", label = "Reverse data order x_var", value = FALSE),
-                 selectInput("LegendPosition", label = "Select position of the legend", choices=c("left", "top", "right", "bottom"), selected = "right")
-        ),
+                 selectInput("Scaling", label = "Scale by", choices=c("None", "2005 = 0", "2010 = 0", "index 2010 = 1", "index 2005 = 1"))
+                 ),
         tabPanel("Colors",
                  selectInput("colour_preset", label = "Select color preset", choices=c("SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "SSP"),
                  checkboxInput("colour_reverse", label = "Reverse", value = FALSE),
@@ -401,6 +398,10 @@ server <- function(input, output, session) {
   
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("barwidth", suffix, sep=""), label = "width of bars", value = 0.8,step=0.1))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("dodgewidth", suffix, sep=""), label = "Unstack width (activates if >0)", value = 0, step=0.1))
+    
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("scaling", suffix, sep=""), label = "Scale by", choices=c("None", "Relative", "Aboslute")))
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("scalingnr", suffix, sep=""), label = "Scale to number", value = 0))
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("scalingyr", suffix, sep=""), label = "Scale relative to year", value = 2010, step = 1))
     
     dyn_taglist
   }
@@ -629,6 +630,33 @@ server <- function(input, output, session) {
         if(!("All" %in% input[[in_name]])){df[,col_name] <- factor(df[,col_name], levels=input[[in_name]])}
       } 
     }
+    
+    colcount <- ncol(df) - 2
+    cln <- colcount + 1
+    
+    df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
+    df$Year = as.integer(as.character(df$Year))
+    
+    scaling = input[[paste("scaling", suffix, sep="")]]
+    yr = input[[paste("scalingyr", suffix, sep="")]]
+    nr = input[[paste("scalingnr", suffix, sep="")]]
+    
+    if(scaling == "Absolute"){
+      df <- spread(df, Year, value)
+      df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)]
+      df <- melt(df, id.vars=1:colcount, variable_name="Year")
+      df <- na.omit(df)
+      df$value <- df$value + nr
+      df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+    }
+    if(scaling == "Relative"){
+      df <- spread(df, Year, value)
+      df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df[,as.character(yr)]
+      df <- melt(df, id.vars=1:colcount, variable_name="Year")
+      df <- na.omit(df)
+      df$value <- df$value + nr
+      df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+    }
 
     return(df) 
   }
@@ -742,7 +770,6 @@ server <- function(input, output, session) {
     if(input$themeopt=="theme_void"){G1 = G1 + theme_void(base_size=14+input$TextSize)}
     
     
-    
     if(input$aspect_ratio > 0) {G1 = G1 + theme(aspect.ratio = input$aspect_ratio)}
     # G1 = G1 +
     #   theme(
@@ -754,13 +781,6 @@ server <- function(input, output, session) {
     #     panel.grid.minor.x=element_blank(),
     #     panel.grid.minor.y=element_blank())
 
-    # if (input$grid_y_opt) {
-    #   G1 = G1 + theme(panel.grid.major.y = element_line(size=.1, color="grey20"))
-    # }
-    # if (input$grid_x_opt) {
-    #   G1 = G1 + theme(panel.grid.major.x = element_line(size=.1, color="grey20"))
-    # }
-    # 
     G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left")
     
     if(input$xlabrotate){G1 = G1 + theme(axis.text.x = element_text(angle=90, hjust=1, vjust =0.5))}
@@ -929,6 +949,7 @@ server <- function(input, output, session) {
   }, height=heightSize, width=widthSize)
   
   output$mytable <- renderDataTable({
+    print(input$tabs)    
     plot_data()
   })
   
