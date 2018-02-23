@@ -165,7 +165,7 @@ color_sspland2 <- c('#bebada','#fb8072','#8dd3c7','#80b1d3','#ffffb3')
 
 debug_opt <- FALSE
 
-nr_of_plots <- 3 #Increased the number of plots available, might slow down stuff
+nr_of_plots <- 5 #Increased the number of plots available, might slow down stuff
 
 ### UI code  ============
 # This main bit 'ui' contains all the frontend bits, defining menu items etc.
@@ -192,7 +192,8 @@ ui <- fluidPage(
          ),
          tabPanel("Labels & Legend",
                   textInput("title", "Title:", value = ""),
-                  textInput("xlab", "Label x-axis", value = ""),
+                  textInput("xlab", "Title x-axis", value = ""),
+                  textInput("scale_x_discretelabels", "Overwrite x-axis labels", value =""),
                   checkboxInput('xlabrotate', 'Rotate x-axis 90 deg', value = FALSE),
                   textInput("ylab", "Label y-axis", value = ""),
                   textInput("colorlabels", "Overwrite color labels (use semicolon seperated list)", value=""),
@@ -221,7 +222,7 @@ ui <- fluidPage(
                  checkboxInput('xman', 'Manually adjust x range?'),
                  numericInput("xmin", label = "Minimum x", value = 2010),
                  numericInput("xmax", label = "Maximum x", value = 2050),
-                 selectInput("Scaling", label = "Scale by", choices=c("None", "2005 = 0", "2010 = 0", "index 2010 = 1", "index 2005 = 1"))
+                 selectInput("Scaling", label = "Scale by (affects all charts)", choices=c("None", "2005 = 0", "2010 = 0", "index 2010 = 1", "index 2005 = 1"))
                  ),
         tabPanel("Colors",
                  selectInput("colour_preset", label = "Select color preset", choices=c("SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "SSP"),
@@ -399,11 +400,11 @@ server <- function(input, output, session) {
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("barwidth", suffix, sep=""), label = "width of bars", value = 0.8,step=0.1))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("dodgewidth", suffix, sep=""), label = "Unstack width (activates if >0)", value = 0, step=0.1))
     
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("scaling", suffix, sep=""), label = "Scale by", choices=c("None", "Relative", "Aboslute")))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("scaling", suffix, sep=""), label = "Scale by", choices=c("None", "Relative", "Absolute")))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("scalingnr", suffix, sep=""), label = "Scale to number", value = 0))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("scalingyr", suffix, sep=""), label = "Scale relative to year", value = 2010, step = 1))
+    dyn_taglist <- tagAppendChild(dyn_taglist, textInput(paste("scalingby", suffix, sep=""), label = "Scale to selection (col;var)", value = "Model;FAO"))
     
-    dyn_taglist
   }
   
   # for (i in 1:nr_of_plots) {
@@ -634,16 +635,38 @@ server <- function(input, output, session) {
     colcount <- ncol(df) - 2
     cln <- colcount + 1
     
-    df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
+    df <- droplevels(df) # necesary because empty levels might be left over after subsetting.
     df$Year = as.integer(as.character(df$Year))
     
     scaling = input[[paste("scaling", suffix, sep="")]]
     yr = input[[paste("scalingyr", suffix, sep="")]]
     nr = input[[paste("scalingnr", suffix, sep="")]]
+    scalingby = input[[paste("scalingby", suffix, sep="")]]
+    
+    scale = 0
+    if (scalingby != "" & scaling == "Absolute") {
+      rowvar <- unlist(strsplit(scalingby, ";"))[2]
+      col <- unlist(strsplit(scalingby, ";"))[1]
+      scale <- df[df[,col]==rowvar & df$Year == yr,]
+      scale = scale$value # will be multiple values in case of facets (or wrong input)
+    }
     
     if(scaling == "Absolute"){
       df <- spread(df, Year, value)
-      df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)]
+      if(scalingby != "" & input$Facet != "None") {
+        rows <- unique(df[,input$Facet])
+        for (i in 1:length(rows)) {
+          dfsub = subset(df, df[,input$Facet]==rows[i])
+          print(dfsub)
+          scale <- dfsub[dfsub[,col]==rowvar,]
+          scale = scale[,as.character(yr)]
+          print (scale)
+          dfsub[,cln:ncol(dfsub)] <- dfsub[,cln:ncol(dfsub)] - dfsub[,as.character(yr)] + scale
+          df <- rbind(dfsub, subset(df, df[,input$Facet]!=rows[i]))
+        }
+      } else {
+        df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)] + scale
+      }
       df <- melt(df, id.vars=1:colcount, variable_name="Year")
       df <- na.omit(df)
       df$value <- df$value + nr
@@ -690,7 +713,7 @@ server <- function(input, output, session) {
       }
     } else if(chartopt=="Point"){
       if(singlecolorcheck) {
-        G1 = G1 + geom_point(data=df, size=size, alpha=alpha, color=singelcolor)
+        G1 = G1 + geom_point(data=df, size=size, alpha=alpha, color=singlecolor)
       } else {
         G1 = G1 + geom_point(data=df, size=size, alpha=alpha)
       }
@@ -710,9 +733,9 @@ server <- function(input, output, session) {
       }
     } else if(chartopt=="Ribbon") {
       if(singlecolorcheck) {
-        G1 = G1 + list(stat_summary(data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, color=singlecolor))
+        G1 = G1 + list(stat_summary(data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA))
       } else {
-        G1 = G1 + list(stat_summary(data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha))
+        G1 = G1 + list(stat_summary(data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA))
       }
     }
     
@@ -731,6 +754,12 @@ server <- function(input, output, session) {
     } else {
       G1 = G1 + scale_color_manual(values=colorset()) 
     }
+    
+    labels <- input$scale_x_discretelabels
+    if (labels!=""){
+      labels <- unlist(strsplit(labels, ";"))
+      G1 = G1 +  scale_x_discrete(labels=labels) 
+    } 
     
     labels <- input$linetypelabels
     if (labels!=""){
@@ -867,12 +896,29 @@ server <- function(input, output, session) {
     # }
     
     if(input$title!=""){
-      titlestring <- unlist(strsplit(input$title, "CO2"))
+      
+      titlestring <- input$title
+      
+      title_list <- unlist(strsplit(titlestring, "%"))
+      if (length(title_list)>1) {
+        titlestring = ""
+        for (i in 1:length(title_list)){
+          if (title_list[i] %in% colnames(plot_subset(plot_data(),1))){
+            uname = unique(plot_subset(plot_data(),1)[,title_list[i]])
+            titlestring = paste(titlestring, uname, sep ="", collapse = ', ')  
+          } else {
+            titlestring = paste(titlestring, title_list[i], sep ="")
+          }
+        }
+      }
+      
+      titlestring2 <- unlist(strsplit(titlestring, "CO2"))
+      
       #N20 toevoetgen.
-      if(titlestring!=input$title){
-        G1 = G1 + ggtitle(bquote(.(titlestring[1])*CO[2]*.(if(length(titlestring)>1){titlestring[2]})))
+      if(titlestring2!=titlestring){
+        G1 = G1 + ggtitle(bquote(.(titlestring2[1])*CO[2]*.(if(length(titlestring2)>1){titlestring2[2]})))
       } else {
-        G1 = G1 + ggtitle(input$title)
+        G1 = G1 + ggtitle(titlestring)
       }
     } else {
       if("Variable_AgMIP" %in% plot_levels()) {
@@ -944,12 +990,13 @@ server <- function(input, output, session) {
     
     G1 <- plot_build(plot_data())
     plot(G1)
-    #ggsave("../output_plots/plot.png")
+    ggsave("../output_plots/plot.png")
     
   }, height=heightSize, width=widthSize)
   
   output$mytable <- renderDataTable({
     print(input$tabs)    
+    #Add routine here that ony shows selected plots
     plot_data()
   })
   
