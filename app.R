@@ -115,8 +115,12 @@ data_cleaner <- function(df){
   if ("Unit" %in% colnames(df) & "Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
     df$Variable_AgMIP <- factor(paste(df$Variable ,"_", df$Item, "_", df$Unit, sep=""))
   }
-  
-  
+  if ("Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
+    # To do, make uppercase
+    # df$Variable = gsub("Area", "AREA", df$Region)
+    # df$Variable = gsub("Area", "AREA", df$Region)
+    # df$Variable = gsub("Area", "AREA", df$Region)
+  }
   
   #some general renaming
   if("Region" %in% colnames(df)){
@@ -163,15 +167,14 @@ color_decomp <- c("#FFCC00", "#C0504D", "#9BBB59", "#8064A2", "#4BC0C6", "#F7964
 color_sspland1 <- c('#b2df8a','#33a02c','#6a3d9a','#fdbf6f','#ff7f00','#1f78b4','#e31a1c')
 color_sspland2 <- c('#bebada','#fb8072','#8dd3c7','#80b1d3','#ffffb3')
 
-debug_opt <- FALSE
-
 nr_of_plots <- 5 #Increased the number of plots available, might slow down stuff
 
 ### UI code  ============
 # This main bit 'ui' contains all the frontend bits, defining menu items etc.
 # ===
 
-ui <- fluidPage(
+ui <- function(request) {
+  fluidPage(
   sidebarLayout(
     sidebarPanel(
       uiOutput('mycharttabs'),
@@ -207,6 +210,8 @@ ui <- fluidPage(
          ),
          tabPanel("Facet",
                   uiOutput("facet_options"),
+                  p("Choose which columns to use for faces in the 'Main' tab."),
+                  checkboxInput("facet_grid", "Use facet grid (2d) wrapping?", value = FALSE),
                   numericInput("ncol", label = "Nr. of colums", value = 2, min=1, step=1),
                   selectInput("scales", label = "Scales for multiple charts:", choices=c("free_y", "free_x","free", "fixed"), selected = "free")
          ),
@@ -249,9 +254,10 @@ ui <- fluidPage(
       )
     ),
     mainPanel(
-      tabsetPanel(
+      tabsetPanel(id="settingstabs",
         tabPanel("Data & settings",
                  p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
+                 p("Use URL as bookmark"),
                  fileInput('file1', 'Choose CSV File to upload (multiple files of same format are possible)',
                            accept = c('text/csv', 'text/comma-separated-values,text/plain', '.csv', '.rda'), multiple = TRUE),
                  selectInput("dataset",label = "Choose Dataset", choices = c(rda_filenames, csv_filenames), selected = "Combined_yield_data.csv"),
@@ -260,7 +266,7 @@ ui <- fluidPage(
                  downloadButton('saveInputs', 'Save settings for re-use later (put in settings folder)')
         ),
         tabPanel("Chart", 
-                 downloadLink("download_png", "Download higher quality PNG"),
+                 downloadButton("download_png", "Download higher quality PNG"),
                  imageOutput("plot1")
         ),
         tabPanel("Table", 
@@ -278,7 +284,8 @@ ui <- fluidPage(
         selected="Chart"
       )
     )
-  ))
+  )) 
+  }
 
 ### Server code =======================
 # Here are al the backend things
@@ -289,8 +296,6 @@ server <- function(input, output, session) {
   options(shiny.maxRequestSize=1000*1024^2)
   
   agmip_csv <- reactive({
-    
-    if(debug_opt){print("Updating agmip_csv function")}
     
     if (exists("input")) {
       
@@ -330,8 +335,6 @@ server <- function(input, output, session) {
   # Flexible UI options -----
   output$flex_options <- renderUI({
     
-    if(debug_opt){print("Updating flex_optionss renderUI")}
-    
     dyn_taglist <- tagList()
     
     col_options = c(colnames(agmip_csv()),"None")
@@ -342,8 +345,10 @@ server <- function(input, output, session) {
     dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('fill', 'Fill (for bar, ribbon, etc)', choices = col_options, selected=def_cols[4]))
     
     dyn_taglist <- tagAppendChildren(dyn_taglist,
-                                     selectInput("x_var", label = "Choose what to use for x axis:", choices = colnames(agmip_csv()),selected = "Year"),
-                                     selectInput("y_var", label = "Choose what to plot on y_axis:", choices = if("index" %in% colnames(agmip_csv())){c("value","index")}else{c("value")}, selected = "value")
+                    selectInput("x_var", label = "Choose what to use for x axis:", choices = colnames(agmip_csv()),selected = "Year"),
+                    selectInput("y_var", label = "Choose what to plot on y_axis:", choices = if("index" %in% colnames(agmip_csv())){c("value","index")}else{c("value")}, selected = "value"),
+                    selectInput("Facet", label = "Facets: Mulptiple chart by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
+                    selectInput("Facet2", label = "Facets: Grid by:", choices = c(colnames(agmip_csv()), "None"),selected = "None")
     )
     
     for(i in 1:dim(agmip_csv())[2]) { # looping over column names
@@ -403,7 +408,7 @@ server <- function(input, output, session) {
     dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("scaling", suffix, sep=""), label = "Scale by", choices=c("None", "Relative", "Absolute")))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("scalingnr", suffix, sep=""), label = "Scale to number", value = 0))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("scalingyr", suffix, sep=""), label = "Scale relative to year", value = 2010, step = 1))
-    dyn_taglist <- tagAppendChild(dyn_taglist, textInput(paste("scalingby", suffix, sep=""), label = "Scale to selection (col;var)", value = "Model;FAO"))
+    dyn_taglist <- tagAppendChild(dyn_taglist, textInput(paste("scalingby", suffix, sep=""), label = "Scale to selection (col;var)", value = ""))
     
   }
   
@@ -422,23 +427,11 @@ server <- function(input, output, session) {
   output$flex_options_chart9 <- renderUI({flex_options(9)})
   output$flex_options_chart10 <- renderUI({flex_options(10)})
   
-  
-  output$facet_options <-  renderUI({
-    dyn_taglist <- tagList()
-    
-    # This inputs steers the facet wrap option of ggplot.
-    dyn_taglist <- tagAppendChildren(dyn_taglist,
-    selectInput("Facet", label = "Mulptiple chart by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
-    selectInput("Facet2", label = "Grid by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
-    checkboxInput("facet_grid", "Use facet grid (2d) wrapping?", value = FALSE)    )
-    
-  })
-  
   output$PNGoptions <-  renderUI({
     dyn_taglist <- tagList()
     dyn_taglist <- tagAppendChildren(dyn_taglist,
                    selectInput("pngloop", label = "Select item to loop for autopng (figures may look a bit different)", choices=plot_levels(), selected = "Variable"),
-                   p("Make sure to set the selction of the item to 'All', it will wil then loop over all available items."),
+                   p("Make sure to set the selction of the item to 'All', it will then loop over all available items."),
                    actionButton("pngbutton", "Make PNGs")
     )
   })
@@ -479,10 +472,38 @@ server <- function(input, output, session) {
     }
   })
   
+  stringconvert <- function(convstr, df) {
+    
+    
+    
+    text_list <- unlist(strsplit(convstr, "%"))
+    if (length(text_list)>1) {
+      convstr = ""
+      for (i in 1:length(text_list)){
+        # Should add that this works for all subsets just in case
+        if (text_list[i] %in% colnames(plot_subset(df,1))){
+          uname = unique(plot_subset(df,1)[,text_list[i]])
+          convstr = paste(convstr, uname, sep ="", collapse = ', ')  
+        } else {
+          convstr = paste(convstr, text_list[i], sep ="")
+        }
+      }
+    } 
+    
+    str2 <- unlist(strsplit(convstr, "CO2"))
+    #N20 toevoetgen.
+    if(!(convstr=="" | identical(str2, character(0)))){
+      if(str2!=convstr){
+        convstr = bquote(.(str2[1])*CO[2]*.(if(length(str2)>1){str2[2]}))
+      } 
+    }
+    
+    return(convstr)
+  }
+  
   # Various observers 
   # Observer for changes in color input
   observe({
-    if(debug_opt){print("Updating color presets")}
     # Color presets -----
     preset <- input$colour_preset
     
@@ -532,7 +553,14 @@ server <- function(input, output, session) {
   observeEvent(input$pngbutton, {
     lp <- unique(plot_data()[,input$pngloop])
     
+    #updateTabsetPanel(session, "tabs", selected = "Main")
+    #updateTabsetPanel(session, "settingstabs", selected = "Chart")
+    
     for (i in 1:length(lp)) {
+      
+      # This doesn't work and its complicated..
+      #updateSelectInput(session, input$pngloop, lp[i])
+      
       ss <- plot_data()
       ss <- subset(ss, ss[,input$pngloop] == lp[i])
       
@@ -547,12 +575,6 @@ server <- function(input, output, session) {
   plot_data <- reactive({
     
     req(input)
-    
-    if(debug_opt){
-      print("Updating plot_data reactive value. Summary of data at start:")
-      print(summary(agmip_csv()))
-      print(plot_levels())
-    }
     
     ss <- agmip_csv()
     colcount <- ncol(ss) - 2
@@ -607,11 +629,6 @@ server <- function(input, output, session) {
       ss[,input$x_var] <- factor(ss[,input$x_var], rev(levels(ss[,input$x_var])))
     }
     
-    if(debug_opt){
-      print("Summary of data returned:")
-      print(summary(ss))
-    }
-    
     return(ss)
     
   })
@@ -657,10 +674,8 @@ server <- function(input, output, session) {
         rows <- unique(df[,input$Facet])
         for (i in 1:length(rows)) {
           dfsub = subset(df, df[,input$Facet]==rows[i])
-          print(dfsub)
           scale <- dfsub[dfsub[,col]==rowvar,]
           scale = scale[,as.character(yr)]
-          print (scale)
           dfsub[,cln:ncol(dfsub)] <- dfsub[,cln:ncol(dfsub)] - dfsub[,as.character(yr)] + scale
           df <- rbind(dfsub, subset(df, df[,input$Facet]!=rows[i]))
         }
@@ -694,7 +709,6 @@ server <- function(input, output, session) {
     size = input[[paste("size", suffix, sep="")]]
     width = input[[paste("barwidth", suffix, sep="")]]
     dodgewidth=input[[paste("dodgewidth", suffix, sep="")]]
-    
     
     singlecolorcheck = input[[paste("singlecolorcheck", suffix, sep="")]]
     singlecolor = input[[paste("singlecolor", suffix, sep="")]]
@@ -857,7 +871,7 @@ server <- function(input, output, session) {
     
   plot_build <- function(df){
     
-    if(debug_opt){print("Updating plot_build function")}
+    if(nrow(df)==0){return(NULL)}
     
     if(input$factor_xvar){df[,input$x_var] <-factor(df[,input$x_var])}
     
@@ -895,62 +909,10 @@ server <- function(input, output, session) {
     #   G1 = G1 + geom_point(data=scen_range,aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point), size=3) + scale_shape(solid = FALSE) 
     # }
     
-    if(input$title!=""){
-      
-      titlestring <- input$title
-      
-      title_list <- unlist(strsplit(titlestring, "%"))
-      if (length(title_list)>1) {
-        titlestring = ""
-        for (i in 1:length(title_list)){
-          if (title_list[i] %in% colnames(plot_subset(plot_data(),1))){
-            uname = unique(plot_subset(plot_data(),1)[,title_list[i]])
-            titlestring = paste(titlestring, uname, sep ="", collapse = ', ')  
-          } else {
-            titlestring = paste(titlestring, title_list[i], sep ="")
-          }
-        }
-      }
-      
-      titlestring2 <- unlist(strsplit(titlestring, "CO2"))
-      
-      #N20 toevoetgen.
-      if(titlestring2!=titlestring){
-        G1 = G1 + ggtitle(bquote(.(titlestring2[1])*CO[2]*.(if(length(titlestring2)>1){titlestring2[2]})))
-      } else {
-        G1 = G1 + ggtitle(titlestring)
-      }
-    } else {
-      if("Variable_AgMIP" %in% plot_levels()) {
-       # G1 = G1 + ggtitle(unique(df$Variable_AgMIP)[1])
-      } else{
-       # G1 = G1 + ggtitle(unique(df$Variable)[1])
-      }
-    }
+    if(input$title!=""){G1 = G1 + ggtitle(stringconvert(convstr = input$title, df))} 
+    if(input$xlab!=""){G1 = G1 + xlab(stringconvert(convstr = input$xlab, df))} 
+    if(input$ylab!=""){G1 = G1 + ylab(stringconvert(convstr = input$ylab, df))} 
     
-    if(input$xlab!=""){
-      titlestring <- unlist(strsplit(input$xlab, "CO2"))
-      if(titlestring!=input$xlab){
-        G1 = G1 + xlab(bquote(.(titlestring[1])*CO[2]*.(if(length(titlestring)>1){titlestring[2]})))
-      } else {
-        G1 = G1 + xlab(input$xlab)
-      }
-    } else {
-        if("Unit" %in% plot_levels()) {
-          G1 = G1 + xlab(unique(df$Variable_AgMIP)[1])
-        }
-    }
-    
-    if(input$ylab!=""){
-      titlestring <- unlist(strsplit(input$ylab, "CO2"))
-      if(titlestring!=input$ylab){
-        G1 = G1 + ylab(bquote(.(titlestring[1])*CO[2]*.(if(length(titlestring)>1){titlestring[2]})))
-      } else {
-        G1 = G1 + ylab(input$ylab)
-      }
-    } 
-    
-       
     if (input$xman){G1 <- G1 + xlim(input$xmin, input$xmax)}  
     if (input$yman){G1 <- G1 + ylim(input$ymin, if(input$ymin<input$ymax){input$ymax}else{NA})}
     
@@ -981,21 +943,18 @@ server <- function(input, output, session) {
   
   #Outputs and rendering --------
   output$plot1 <- renderPlot({
-    if(debug_opt){print("Rendering plot")}
     
-    if (nrow(plot_data())==0) {
-      if(debug_opt){print("No plot data (yet)")}
-       return(NULL)
-    }
-    
+    if (nrow(plot_data())==0){return(NULL)
+      }
     G1 <- plot_build(plot_data())
     plot(G1)
-    ggsave("../output_plots/plot.png")
+
+#    write.csv(AllInputs(), "./latest_settings.ini", row.names=FALSE)
     
   }, height=heightSize, width=widthSize)
   
   output$mytable <- renderDataTable({
-    print(input$tabs)    
+    #print(input$tabs)    
     #Add routine here that ony shows selected plots
     plot_data()
   })
@@ -1011,6 +970,9 @@ server <- function(input, output, session) {
   output$download_png <- downloadHandler(
     filename = "plot.png",
     content = function(file) {
+      G1 <- plot_build(plot_data())
+      plot(G1)
+      ggsave("../output_plots/plot.png", plot = last_plot())
       file.copy("../output_plots/plot.png", file)
     },
     contentType = "image/png" 
@@ -1018,8 +980,6 @@ server <- function(input, output, session) {
   
   # Related to saving of settings ------
   AllInputs <- reactive({
-
-    if(debug_opt){print("updating AllInputs reactive value")}
 
     myvalues <- c(0,0)
     for(i in 1:length(names(input))){
@@ -1064,8 +1024,6 @@ server <- function(input, output, session) {
     input$update_settings
     }, {
 
-    if(debug_opt){print("updating AllInputs reactive value")}
-
     ids = as.vector(droplevels(unique(settings_list()[,1])))
 
     for (i in 1:length(ids)) {
@@ -1084,10 +1042,26 @@ server <- function(input, output, session) {
       }
     }
   })
+  
+  onRestored(function(state) {
+    updateTabsetPanel(session, "tabs", selected="Main")
+    updateTabsetPanel(session, "settingstabs", selected="Chart")
+  })
+   observe({
+  #   # Trigger this observer every time an input changes
+     req(input$chart1)
+     reactiveValuesToList(input)
+     #if(input$settingstabs == "Data & settings"){
+       session$doBookmark()
+      #}
+   })
+   onBookmarked(function(url) {
+     updateQueryString(url)
+   })
 }
 
 # Run the application  ----
-shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server, enableBookmarking = "url")
 
 
 
