@@ -14,7 +14,12 @@ library(data.table)
 library(knitr)
 library(tidyr)
 library(colourpicker)
+library(shiny)
+# library(Cairo)
 
+# options(shiny.usecairo=FALSE)
+
+        
 # ---- Functions
 scenario_range <- function(df, yr) {  
   
@@ -230,9 +235,9 @@ ui <- function(request) {
                  selectInput("Scaling", label = "Scale by (affects all charts)", choices=c("None", "2005 = 0", "2010 = 0", "index 2010 = 1", "index 2005 = 1"))
                  ),
         tabPanel("Colors",
-                 selectInput("colour_preset", label = "Select color preset", choices=c("SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "SSP"),
+                 selectInput("colour_preset", label = "Select color preset", choices=c("None","SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "None"),
                  checkboxInput("colour_reverse", label = "Reverse", value = FALSE),
-                 colourInput("c1","Pick colour 1", value=color_ssp[1]),
+                 colourInput("c1","Pick colour 1", "#00FF00"),
                  colourInput("c2","Pick colour 2", value=color_ssp[2]),
                  colourInput("c3","Pick colour 3", value=color_ssp[3]),
                  colourInput("c4","Pick colour 4", value=color_ssp[4]),
@@ -257,7 +262,7 @@ ui <- function(request) {
       tabsetPanel(id="settingstabs",
         tabPanel("Data & settings",
                  p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
-                 p("Use URL as bookmark"),
+                 p("Use URL as bookmark (if running locally restart if port is not 5900)"),
                  fileInput('file1', 'Choose CSV File to upload (multiple files of same format are possible)',
                            accept = c('text/csv', 'text/comma-separated-values,text/plain', '.csv', '.rda'), multiple = TRUE),
                  selectInput("dataset",label = "Choose Dataset", choices = c(rda_filenames, csv_filenames), selected = "Combined_yield_data.csv"),
@@ -267,6 +272,7 @@ ui <- function(request) {
         ),
         tabPanel("Chart", 
                  downloadButton("download_png", "Download higher quality PNG"),
+                 # bookmarkButton(label = "Bookmark to shiny_bookmarks folder and restore in browser."),
                  imageOutput("plot1")
         ),
         tabPanel("Table", 
@@ -315,6 +321,8 @@ server <- function(input, output, session) {
         DATA <- my_dataread(input)
       } 
     } 
+    
+    DATA <- DATA[!duplicated(DATA),]
     
     return(DATA)
   })
@@ -430,8 +438,8 @@ server <- function(input, output, session) {
   output$PNGoptions <-  renderUI({
     dyn_taglist <- tagList()
     dyn_taglist <- tagAppendChildren(dyn_taglist,
-                   selectInput("pngloop", label = "Select item to loop for autopng (figures may look a bit different)", choices=plot_levels(), selected = "Variable"),
-                   p("Make sure to set the selction of the item to 'All', it will then loop over all available items."),
+                   selectInput("pngloop", label = "Select item to loop for autopng (figures may look a bit different, test it out)", choices=plot_levels(), selected = "Variable"),
+                   p("Make sure to set the selection of the item to 'All', both in Main and Chart#, it will then loop over all available items."),
                    actionButton("pngbutton", "Make PNGs")
     )
   })
@@ -503,10 +511,10 @@ server <- function(input, output, session) {
   
   # Various observers 
   # Observer for changes in color input
-  observe({
+  observeEvent(input$colour_preset, {
     # Color presets -----
     preset <- input$colour_preset
-    
+
     if(preset=="Decomp") {
       col_scale <- color_decomp
       if(input$colour_reverse){col_scale <- rev(col_scale)}
@@ -628,9 +636,7 @@ server <- function(input, output, session) {
     if(input$Reverse_x_var) {
       ss[,input$x_var] <- factor(ss[,input$x_var], rev(levels(ss[,input$x_var])))
     }
-    
     return(ss)
-    
   })
   
   # Plot building ====
@@ -747,9 +753,9 @@ server <- function(input, output, session) {
       }
     } else if(chartopt=="Ribbon") {
       if(singlecolorcheck) {
-        G1 = G1 + list(stat_summary(data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA))
+        G1 = G1 + list(stat_summary(aes_string(x=input$x_var, y=input$y_var,fill=fill), data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA, inherit.aes = FALSE))
       } else {
-        G1 = G1 + list(stat_summary(data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA))
+        G1 = G1 + list(stat_summary(aes_string(x=input$x_var, y=input$y_var, fill=fill), data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA, inherit.aes = FALSE))
       }
     }
     
@@ -944,11 +950,14 @@ server <- function(input, output, session) {
   #Outputs and rendering --------
   output$plot1 <- renderPlot({
     
-    if (nrow(plot_data())==0){return(NULL)
+    if (nrow(plot_data())==0){
+      #print("No plot data (yet)")
+      return(NULL)
       }
     G1 <- plot_build(plot_data())
     plot(G1)
-
+    ggsave("../output_plots/plot.png", plot = last_plot())
+    
 #    write.csv(AllInputs(), "./latest_settings.ini", row.names=FALSE)
     
   }, height=heightSize, width=widthSize)
@@ -956,7 +965,14 @@ server <- function(input, output, session) {
   output$mytable <- renderDataTable({
     #print(input$tabs)    
     #Add routine here that ony shows selected plots
-    plot_data()
+    tab <- input$tabs
+    if(substr(tab, 1, 5) == "Chart") {
+      suffix <- as.numeric(substr(tab, nchar(tab), nchar(tab)))
+      plot_subset(plot_data(), suffix)
+    } else {
+      plot_data()
+    }
+    
   })
   
   output$downloadData <- downloadHandler(
@@ -970,9 +986,6 @@ server <- function(input, output, session) {
   output$download_png <- downloadHandler(
     filename = "plot.png",
     content = function(file) {
-      G1 <- plot_build(plot_data())
-      plot(G1)
-      ggsave("../output_plots/plot.png", plot = last_plot())
       file.copy("../output_plots/plot.png", file)
     },
     contentType = "image/png" 
@@ -989,9 +1002,7 @@ server <- function(input, output, session) {
           names(input)[i]!="dataset" &
           names(input)[i]!="file1" &
           names(input)[i]!="Preset" &
-          names(input)[i]!="settings_opt") 
-
-           {
+          names(input)[i]!="settings_opt") {
         myvalues <- as.data.frame(rbind(myvalues,
                         (cbind(names(input)[i],
                                if(is.null(input[[names(input)[i]]])){
@@ -1016,7 +1027,9 @@ server <- function(input, output, session) {
   
   settings_list <- reactive({
     if (exists("input")) {
-      settings_list <- as.data.frame(read.csv(paste("./settings/",input$settings_opt, sep=""), sep=",", dec="."))
+      if (input$settings_opt != "None") {
+        settings_list <- as.data.frame(read.csv(paste("./settings/",input$settings_opt, sep=""), sep=",", dec="."))
+      }
     }
   })
   
@@ -1043,25 +1056,31 @@ server <- function(input, output, session) {
     }
   })
   
+  setBookmarkExclude(c("update_settings", "settings_opt"))
+  
   onRestored(function(state) {
     updateTabsetPanel(session, "tabs", selected="Main")
     updateTabsetPanel(session, "settingstabs", selected="Chart")
+    
   })
    observe({
-  #   # Trigger this observer every time an input changes
+     # Trigger this observer every time an input changes
+
+
      req(input$chart1)
      reactiveValuesToList(input)
+     
+     #print(deparse(scenario_range))
+
      #if(input$settingstabs == "Data & settings"){
        session$doBookmark()
       #}
-   })
-   onBookmarked(function(url) {
-     updateQueryString(url)
-   })
+    })
+    onBookmarked(function(url) {
+      updateQueryString(url)
+    })
 }
-
+options(shiny.port=5903)
 # Run the application  ----
 shinyApp(ui = ui, server = server, enableBookmarking = "url")
-
-
 
