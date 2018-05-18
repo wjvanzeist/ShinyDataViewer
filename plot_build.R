@@ -17,8 +17,167 @@ library(colourpicker)
 library(shiny)
 # library(Cairo)
 
+source('./WJlib.R')
 
+plot_data_wj <- function(df,input){
   
+  
+  colcount <- ncol(df) - 2
+  cln <- colcount + 1
+  plot_levels <- plot_levels(df)
+  
+  for (i in 1:length(plot_levels)) {
+    # subsets for all plot levels used for input control. 
+    # Double brackets for input needed because it is a reactivevalues cladf
+    
+    #if(input$pngloop!=plot_levels[i]){
+    if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
+    #}
+    if(!(plot_levels[i] == "Year")) { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df[,plot_levels[i]] <- factor(df[,plot_levels[i]], levels=input[[plot_levels[i]]])}
+    }   
+  }
+  
+  df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
+  df$Year = as.integer(as.character(df$Year))
+  
+  if(input$Scaling == "2005 = 0"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){df$index <- NULL}
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df$'2005'
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  if(input$Scaling == "2010 = 0"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){df$index <- NULL}
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df$'2010'
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  if(input$Scaling == "index 2010 = 1"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){df$index <- NULL}
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df$'2010'
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  if(input$Scaling == "index 2005 = 1"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){df$index <- NULL}
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df$'2005'
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  
+  # if(input$LegendReverse) {
+  #   df[,input$fill] <- factor(df[,input$fill], rev(levels(df[,input$fill])))
+  # }
+  if(input$Reverse_x_var) {
+    df[,input$x_var] <- factor(df[,input$x_var], rev(levels(df[,input$x_var])))
+  }
+  
+  return(df)
+}
+
+# data_cleaner <- function(df){
+#   
+#   #Multiple claenup of names/headers units, etc.
+#   #Also tries to detect years in column names to convert to long format
+#   #Creates AgMIP item & variable columns if detected
+#   
+#   #Renaming some columns
+#   df <- plyr::rename(df, c("region"="Region", "model"="Model", "variable"="Variable", "scenario"="Scenario", "year"="Year", "unit"="Unit", "item"="Item"), warn_missing=FALSE)
+#   df <- plyr::rename(df, c("Index"="index", "Value"="value"), warn_missing=FALSE)
+#   df <- plyr::rename(df, c("REGION"="Region", "MODEL"="Model", "VARIABLE"="Variable", "SCENARIO"="Scenario", "YEAR"="Year", "UNIT"="Unit", "ITEM"="Item"), warn_missing=FALSE)
+#   df <- plyr::rename(df, c("INDEX"="index", "INDEX"="value"), warn_missing=FALSE)
+#   
+#   #converting years if found
+#   if (!("Year" %in% colnames(df))){
+#     if ("X2010" %in% colnames(df)|"X2005" %in% colnames(df)|"X2015" %in% colnames(df)|"X2000" %in% colnames(df)) {
+#       for (i in 1970:2100) { # finding first year occurrence.
+#         clnr = match(paste("X", i, sep=""), colnames(df), nomatch = 0)
+#         if (clnr != 0) {break}
+#       }
+#       df <- melt(df, id=1:clnr-1, variable_name = "Year")
+#       df$Year = as.numeric(substr(df$Year, 2, stop=100))      
+#     }
+#   }
+# 
+#   # Just to be sure, not sure if all of the below is necessary.
+#   if("value" %in% colnames(df)) {
+#     df$value <- as.numeric(substr(df$value, 1, stop=100))
+#   }
+#   if("index" %in% colnames(df)){
+#     df$index <- as.numeric(df$index)
+#   }
+#   if("Year" %in% colnames(df)) {
+#     df$Year = as.integer(as.character(df$Year))
+#   }
+#   
+#   #Making agmip columsn ig "AGMIP| etc is detected
+#   if("Variable" %in% colnames(df)) {
+#     if (!("Item" %in% colnames(df)) & substr(df$Variable[1],1,5) == "AGMIP") {
+#       df$Variable <- gsub("AGMIP|", "", df$Variable, fixed=TRUE)
+#       df$Item <- gsub("\\|.*", "", df$Variable) # Everything after | removed
+#       df$Variable <- gsub(".*\\|", "", df$Variable)
+#     }
+#   }
+#   
+#   if ("Unit" %in% colnames(df) & "Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
+#     df$Variable_AgMIP <- factor(paste(df$Variable ,"_", df$Item, "_", df$Unit, sep=""))
+#   }
+#   if ("Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
+#     # To do, make uppercase
+#     # df$Variable = gsub("Area", "AREA", df$Region)
+#     # df$Variable = gsub("Area", "AREA", df$Region)
+#     # df$Variable = gsub("Area", "AREA", df$Region)
+#   }
+#   
+#   #some general renaming
+#   if("Region" %in% colnames(df)){
+#     df$Region = gsub("R5.2", "", df$Region)
+#     df$Region = gsub("Global", "World", df$Region)
+#     df$Region = gsub("WLD", "World", df$Region)
+#     df$Region = gsub("Global", "World", df$Region)
+#     df$Region = gsub("Total", "World", df$Region)
+#   }
+#   if("Unit" %in% colnames(df)){
+#     df$Unit = gsub("Mt CO2e", "MtCO2e",df$Unit)
+#     df$Unit = gsub("kcal/cap/day", "kcal/cap/d",df$Unit)
+#   }
+#   if("Item" %in% colnames(df)){
+#     df$Item = gsub("wheat", "Wheat", df$Item)
+#     df$Item = gsub("barley", "Barley", df$Item)
+#     df$Item = gsub("maize", "Maize", df$Item)
+#     df$Item = gsub("oats", "Oats", df$Item)
+#     df$Item = gsub("rice", "Rice", df$Item)
+#     df$Item = gsub("rye", "Rye", df$Item)
+#     df$Item = gsub("millet", "Millet", df$Item)
+#     df$Item = gsub("sorghum", "Sorghum", df$Item)
+#   #  df$Item = gsub("Cereals", "Cereal", df$Item)
+#   }
+#   
+#   df = na.omit(df)
+#   
+#   #This makes sure that all non-numeric columns are factorized.
+#   df <- df %>% mutate_if(is.character,as.factor)
+#   if("value" %in% colnames(df)) {
+#     df$value <- as.numeric(df$value)
+#     col_idx <- grep("value", names(df))
+#     df <- df[, c((1:ncol(df))[-col_idx],col_idx)]
+#   }
+#   
+#   df <- df[!duplicated(df),]
+#   #value needs to be in the end
+#   
+#   return(df)
+# }
+#   
 plot_levels <- function(df) {
   #returns lists of names which are factors or integers
   colnames(df[!sapply(df, is.numeric) | sapply(df, is.numeric)])
@@ -209,6 +368,9 @@ plot_build_suf <- function(G1, df, suffix, chartopt, input) {
     if(dodgewidth==0){position="stack"}else{position=position_dodge(dodgewidth)}
   } else if(chartopt=="Area") {
     geom="area"
+  } else if(chartopt=="geom_smooth") {
+    geom="line"
+    stat="smooth"
   } else if(chartopt=="Ribbon") {
     stat="summary"
     geom="ribbon"

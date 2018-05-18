@@ -15,98 +15,12 @@ library(knitr)
 library(tidyr)
 library(colourpicker)
 library(shiny)
+library(shinyjs)
+
 # library(Cairo)
 
 source('./plot_build.R')
-# options(shiny.usecairo=FALSE)
-
-data_cleaner <- function(df){
-  
-  #Multiple claenup of names/headers units, etc.
-  #Also tries to detect years in column names to convert to long format
-  #Creates AgMIP item & variable columns if detected
-  
-  #Renaming some columns
-  df <- plyr::rename(df, c("region"="Region", "model"="Model", "variable"="Variable", "scenario"="Scenario", "year"="Year", "unit"="Unit", "item"="Item"), warn_missing=FALSE)
-  df <- plyr::rename(df, c("Index"="index", "Value"="value"), warn_missing=FALSE)
-  df <- plyr::rename(df, c("REGION"="Region", "MODEL"="Model", "VARIABLE"="Variable", "SCENARIO"="Scenario", "YEAR"="Year", "UNIT"="Unit", "ITEM"="Item"), warn_missing=FALSE)
-  df <- plyr::rename(df, c("INDEX"="index", "INDEX"="value"), warn_missing=FALSE)
-  
-  #converting years if found
-  if (!("Year" %in% colnames(df))){
-    if ("X2010" %in% colnames(df)|"X2005" %in% colnames(df)|"X2015" %in% colnames(df)|"X2000" %in% colnames(df)) {
-      for (i in 1970:2100) { # finding first year occurrence.
-        clnr = match(paste("X", i, sep=""), colnames(df), nomatch = 0)
-        if (clnr != 0) {break}
-      }
-      df <- melt(df, id=1:clnr-1, variable_name = "Year")
-      df$Year = as.numeric(substr(df$Year, 2, stop=100))      
-    }
-  }
-  
-  # Just to be sure, not sure if all of the below is necessary.
-  df$value <- as.numeric(substr(df$value, 1, stop=100))
-  if("index" %in% colnames(df)){
-    df$index <- as.numeric(df$index)
-  }
-  df$Year = as.integer(as.character(df$Year))
-  
-  #Making agmip columsn ig "AGMIP| etc is detected
-  if (!("Item" %in% colnames(df)) & substr(df$Variable[1],1,5) == "AGMIP") {
-    df$Variable <- gsub("AGMIP|", "", df$Variable, fixed=TRUE)
-    df$Item <- gsub("\\|.*", "", df$Variable) # Everything after | removed
-    df$Variable <- gsub(".*\\|", "", df$Variable)
-  }
-  
-  if ("Unit" %in% colnames(df) & "Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
-    df$Variable_AgMIP <- factor(paste(df$Variable ,"_", df$Item, "_", df$Unit, sep=""))
-  }
-  if ("Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
-    # To do, make uppercase
-    # df$Variable = gsub("Area", "AREA", df$Region)
-    # df$Variable = gsub("Area", "AREA", df$Region)
-    # df$Variable = gsub("Area", "AREA", df$Region)
-  }
-  
-  #some general renaming
-  if("Region" %in% colnames(df)){
-    df$Region = gsub("R5.2", "", df$Region)
-    df$Region = gsub("Global", "World", df$Region)
-    df$Region = gsub("WLD", "World", df$Region)
-    df$Region = gsub("Global", "World", df$Region)
-    df$Region = gsub("Total", "World", df$Region)
-  }
-  if("Unit" %in% colnames(df)){
-    df$Unit = gsub("Mt CO2e", "MtCO2e",df$Unit)
-    df$Unit = gsub("kcal/cap/day", "kcal/cap/d",df$Unit)
-  }
-  if("Item" %in% colnames(df)){
-    df$Item = gsub("wheat", "Wheat", df$Item)
-    df$Item = gsub("barley", "Barley", df$Item)
-    df$Item = gsub("maize", "Maize", df$Item)
-    df$Item = gsub("oats", "Oats", df$Item)
-    df$Item = gsub("rice", "Rice", df$Item)
-    df$Item = gsub("rye", "Rye", df$Item)
-    df$Item = gsub("millet", "Millet", df$Item)
-    df$Item = gsub("sorghum", "Sorghum", df$Item)
-    df$Item = gsub("Cereals", "Cereal", df$Item)
-  }
-  
-  df = na.omit(df)
-  
-  #This makes sure that all non-numeric columns are factorized.
-  df <- df %>% mutate_if(is.character,as.factor)
-  df$value <- as.numeric(df$value)
-  
-  df <- df[!duplicated(df),]
-  
-  #value needs to be in the end
-  col_idx <- grep("value", names(df))
-  df <- df[, c((1:ncol(df))[-col_idx],col_idx)]
-  
-  return(df)
-}
-
+source('./WJlib.R')
 
 # Initialzing global vars ---------------------------------------------
 if(dir.exists("../data_files")){datapath="../data_files"}else{datapath="./"}
@@ -124,6 +38,9 @@ color_sspland2 <- c('#bebada','#fb8072','#8dd3c7','#80b1d3','#ffffb3')
 # ===
 
 ui <- function(request) {
+  
+  useShinyjs()
+  
   fluidPage(
   sidebarLayout(
     sidebarPanel(
@@ -131,16 +48,14 @@ ui <- function(request) {
          tabPanel("Main", id="Main",
                   p('Selection will influence order of plots. Selection applies to all plots'),
                   uiOutput("flex_options"),
-                  textAreaInput("plot_text_add", "Add code lines to plot build function:", value="
-                  ##The dataframe is named df in the code and use G1 = G1 + code to add to the plot, for example add continuous scale details
-                                #G1 = G1 + scale_y_continuous(breaks=seq(-1000,1000,200),limits=c(-1100,1100))", width="800px", height="400px")
+                  textAreaInput("plot_text_add", "Add code lines to plot build function:", value="#G1 = G1 + code to add to the plot")
                   
          ),
          tabPanel("Theme",
                   selectInput("themeopt", "select theme:", choices=c("theme_bw", "theme_classic", "theme_dark","theme_gray","theme_light","theme_minimal","theme_void", "Other"), selected="theme_classic"),
                   sliderInput('TextSize', 'Text size adjustment', min=-16, max=20, value=0, step=1, round=0),
-                  colourInput("panel.background.color", "Panel background color:", value=""),
-                  colourInput("panel.grid.color", "Grid color:", value="#E0E0E0"),
+                  colourpicker::colourInput("panel.background.color", "Panel background color:", value=""),
+                  colourpicker::colourInput("panel.grid.color", "Grid color:", value="#E0E0E0"),
                   numericInput("panel.grid.major.x", "Major x grid (if>0):", value=0, min=0, step=0.2),
                   numericInput("panel.grid.major.y", "Major y grid (if>0):", value=0, min=0, step=0.2),
                   numericInput("panel.grid.minor.x", "Minor x grid (if>0):", value=0, min=0, step=0.2),
@@ -187,24 +102,25 @@ ui <- function(request) {
                  selectInput("colour_preset", label = "Select color preset", choices=c("None","SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "None"),
                  textInput("colour_list", label="Provide ; seperated list of colours to override below", value=""),
                  checkboxInput("colour_reverse", label = "Reverse", value = FALSE),
-                 colourInput("c1","Pick colour 1", "#00FF00"),
-                 colourInput("c2","Pick colour 2", value=color_ssp[2]),
-                 colourInput("c3","Pick colour 3", value=color_ssp[3]),
-                 colourInput("c4","Pick colour 4", value=color_ssp[4]),
-                 colourInput("c5","Pick colour 5", value=color_ssp[5]),
-                 colourInput("c6","Pick colour 6", value=rainbow(12)[6]),
-                 colourInput("c7","Pick colour 7", value=rainbow(12)[7]),
-                 colourInput("c8","Pick colour 8", value=rainbow(12)[8]),
-                 colourInput("c9","Pick colour 9", value=rainbow(12)[9]),
-                 colourInput("c10","Pick colour 10", value=rainbow(12)[10]),
-                 colourInput("c11","Pick colour 11", value=rainbow(12)[11]),
-                 colourInput("c12","Pick colour 12", value=rainbow(12)[12])
+                 colourpicker::colourInput("c1","Pick colour 1", "#00FF00"),
+                 colourpicker::colourInput("c2","Pick colour 2", value=color_ssp[2]),
+                 colourpicker::colourInput("c3","Pick colour 3", value=color_ssp[3]),
+                 colourpicker::colourInput("c4","Pick colour 4", value=color_ssp[4]),
+                 colourpicker::colourInput("c5","Pick colour 5", value=color_ssp[5]),
+                 colourpicker::colourInput("c6","Pick colour 6", value=rainbow(12)[6]),
+                 colourpicker::colourInput("c7","Pick colour 7", value=rainbow(12)[7]),
+                 colourpicker::colourInput("c8","Pick colour 8", value=rainbow(12)[8]),
+                 colourpicker::colourInput("c9","Pick colour 9", value=rainbow(12)[9]),
+                 colourpicker::colourInput("c10","Pick colour 10", value=rainbow(12)[10]),
+                 colourpicker::colourInput("c11","Pick colour 11", value=rainbow(12)[11]),
+                 colourpicker::colourInput("c12","Pick colour 12", value=rainbow(12)[12])
         ),
         tabPanel("Coordinates",
                  checkboxInput('flip', 'Flip coordinates'),
                  checkboxInput('polar', 'Use polar coordinate system')
 
         ),
+        #https://shiny.rstudio.com/gallery/creating-a-ui-from-a-loop.html
         tabPanel("Chart1", uiOutput("flex_options_chart1")),
         tabPanel("Chart2", uiOutput("flex_options_chart2")),
         tabPanel("Chart3", uiOutput("flex_options_chart3")),
@@ -218,7 +134,7 @@ ui <- function(request) {
         selected = "Chart1" #ACtivates main panel
       )
     ),
-    mainPanel(
+    mainPanel(style = "overflow-y:scroll",
       tabsetPanel(id="settingstabs",
         tabPanel("Data & settings",
                  p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
@@ -230,6 +146,8 @@ ui <- function(request) {
                  actionButton('update_settings', 'Force update settings'),
                  downloadButton('saveInputs', 'Save settings for re-use later (put in settings folder)'),
                  numericInput('nr_of_plots', 'Number of plots (do not change)', min=1, max=100, value=10, step = 1)
+                 
+                 # Idea add waiting button https://github.com/daattali/advanced-shiny/tree/master/busy-indicator
         ),
         tabPanel("Chart", 
                  downloadButton("download_png", "Download higher quality PNG"),
@@ -241,7 +159,7 @@ ui <- function(request) {
                  dataTableOutput("mytable")
         ),
         tabPanel("ggplot code",
-                 p('Code below can be run standalone (is now copied to clipboard'),
+                 p('Code below can be run standalone with plot_build.R'),
                  verbatimTextOutput("coderecycle")
         ),
         tabPanel("AutoPNG",
@@ -260,71 +178,71 @@ ui <- function(request) {
 server <- function(input, output, session) {
   # Reading csv ====
   options(shiny.maxRequestSize=1000*1024^2)
+  session$onSessionEnded(stopApp)
   
   agmip_csv <- reactive({
     req(input)
     
-    fname = paste(datapath,input$dataset,sep="/")
+    
+    
     
     if (is.null(input$file1)) {
-      if (file_ext(input$dataset)[1] == "rda") { 
-        DATA <- readRDS(fname)
-      } else {
-        DATA <- read.csv(fname, sep=",", dec=".")
-      }
+      fname = paste(datapath,input$dataset,sep="/")
+      DATA <- my_dataread(fname)
+      # if (file_ext(input$dataset)[1] == "rda") { 
+      #   DATA <- readRDS(fname)
+      # } else {
+      #   DATA <- read.csv(fname, sep=",", dec=".")
+      # }
       #Some things might get renamed here, just so you know! 
       #This general cleanup routine does a bunch of things
-      DATA <- data_cleaner(DATA)
+      # DATA <- data_cleaner(DATA)
     } else {
       #My_dataread can do multiple files
+      print(input$file1)
+      DATA <- my_dataread(input$file1[,4], input$file1[,1])
       
-      filecount = length(input$file1[,1])
       
-      for(i in 1:filecount){
-        
-        f <- input$file1[[i, 'datapath']]
-        
-        if (file_ext(input$file1[[i, 'name']])[1] == "rda") { 
-          DATAtmp <- readRDS(f)
-        } else {
-          DATAtmp <- read.csv(f, sep=",", dec=".")
-          if(ncol(DATAtmp)==1) {
-            DATAtmp <- read.csv(f, sep=";", dec=".")
-          }
-        }
-        
-        DATAtmp <- data_cleaner(DATAtmp)
-        
-        if(filecount>1){
-          DATAtmp$file_name <- input$file1[[i, 'name']]
-          # Moving new filename column to front
-          DATAtmp <- DATAtmp[,c(ncol(DATAtmp),1:(ncol(DATAtmp)-1))]
-          if(i==1){
-            DATA <- DATAtmp
-          } else {
-            DATA <- rbind(DATA, DATAtmp)
-          }
-        } else {
-          DATA <- DATAtmp
-        }
-      }
+      # filecount = length(input$file1[,1])
+      # 
+      # for(i in 1:filecount){
+      #   
+      #   f <- input$file1[[i, 'datapath']]
+      #   
+      #   if (file_ext(input$file1[[i, 'name']])[1] == "rda") { 
+      #     DATAtmp <- readRDS(f)
+      #   } else {
+      #     DATAtmp <- read.csv(f, sep=",", dec=".")
+      #     if(ncol(DATAtmp)==1) {
+      #       DATAtmp <- read.csv(f, sep=";", dec=".")
+      #     }
+      #   }
+      #   
+      #   DATAtmp <- data_cleaner(DATAtmp)
+      #   
+      #   if(filecount>1){
+      #     DATAtmp$file_name <- input$file1[[i, 'name']]
+      #     # Moving new filename column to front
+      #     DATAtmp <- DATAtmp[,c(ncol(DATAtmp),1:(ncol(DATAtmp)-1))]
+      #     if(i==1){
+      #       DATA <- DATAtmp
+      #     } else {
+      #       DATA <- rbind(DATA, DATAtmp)
+      #     }
+      #   } else {
+      #     DATA <- DATAtmp
+      #   }
+      # }
     }
     return(DATA)
   })
   
   plot_levels <- reactive({
     #returns lists of names which are factors or integers
-    colnames(agmip_csv()[!sapply(agmip_csv(), is.numeric) | sapply(agmip_csv(), is.numeric)])
+ #   pl <- colnames(agmip_csv()[!sapply(agmip_csv(), is.numeric) | sapply(agmip_csv(), is.numeric)])
+    pl <- colnames(agmip_csv())
+    return(pl)
   })
-  
-  # output$mycharttabs = renderUI({
-  #   for (i in input$nr_of_plots:1) {
-  # 
-  #     insertTab(inputId="tabs", 
-  #               tabPanel(paste("Chart", i, sep=""), uiOutput(paste("flex_options_chart", i, sep=""))),
-  #               target="Main", position="after", select=TRUE)
-  #     }
-  #   })
   
   # Flexible UI options -----
   output$flex_options <- renderUI({
@@ -340,7 +258,7 @@ server <- function(input, output, session) {
     
     dyn_taglist <- tagAppendChildren(dyn_taglist,
                     selectInput("x_var", label = "Choose what to use for x axis:", choices = colnames(agmip_csv()),selected = "Year"),
-                    selectInput("y_var", label = "Choose what to plot on y_axis:", choices = if("index" %in% colnames(agmip_csv())){c("value","index")}else{c("value")}, selected = "value"),
+                    selectInput("y_var", label = "Choose what to plot on y_axis:", choices = colnames(agmip_csv()), selected = if(!("value" %in% colnames(agmip_csv()))){tail(colnames(agmip_csv()),1)}else{c("value")}),
                     selectInput("Facet", label = "Facets: Mulptiple chart by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
                     selectInput("Facet2", label = "Facets: Grid by:", choices = c(colnames(agmip_csv()), "None"),selected = "None")
     )
@@ -369,7 +287,7 @@ server <- function(input, output, session) {
     dyn_taglist <- tagList()
     
     sel = if(suffix==1){"Line"}else{"None"} # setting default
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("chart", suffix, sep=""), label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","geom_vline","geom_hline","linesummary","average_line","None"), selected = sel))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("chart", suffix, sep=""), label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","geom_vline","geom_hline","linesummary","average_line","geom_smooth", "None"), selected = sel))
 
     for(i in 1:dim(agmip_csv())[2]) { # looping over column names
       if (colnames(agmip_csv())[i] %in% plot_levels()) {
@@ -396,7 +314,7 @@ server <- function(input, output, session) {
     
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste('size',suffix,sep=""), 'Size (line thickness etc.)', value=1.5, step=0.25))
     dyn_taglist <- tagAppendChild(dyn_taglist, checkboxInput(paste('singlecolorcheck',suffix,sep=""), 'Use single color', value=FALSE))
-    dyn_taglist <- tagAppendChild(dyn_taglist, colourInput(paste('singlecolor',suffix,sep=""),"Pick single colour", value="#000000"))
+    dyn_taglist <- tagAppendChild(dyn_taglist, colourpicker::colourInput(paste('singlecolor',suffix,sep=""),"Pick single colour", value="#000000"))
     dyn_taglist <- tagAppendChild(dyn_taglist, sliderInput(paste('alpha',suffix,sep=""), 'Alpha', min=0, max=1, value=1, step=0.01))
   
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("barwidth", suffix, sep=""), label = "width of bars", value = 0.8,step=0.1))
@@ -471,33 +389,6 @@ server <- function(input, output, session) {
       return(cset)
     }
   })
-  
-  stringconvert <- function(convstr, df) {
-    
-    text_list <- unlist(strsplit(convstr, "%"))
-    if (length(text_list)>1) {
-      convstr = ""
-      for (i in 1:length(text_list)){
-        # Should add that this works for all subsets just in case
-        if (text_list[i] %in% colnames(plot_subset(df,1))){
-          uname = unique(plot_subset(df,1)[,text_list[i]])
-          convstr = paste(convstr, uname, sep ="", collapse = ', ')  
-        } else {
-          convstr = paste(convstr, text_list[i], sep ="")
-        }
-      }
-    } 
-    
-    str2 <- unlist(strsplit(convstr, "CO2"))
-    #N20 toevoetgen.
-    if(!(convstr=="" | identical(str2, character(0)))){
-      if(str2!=convstr){
-        convstr = bquote(.(str2[1])*CO[2]*.(if(length(str2)>1){str2[2]}))
-      } 
-    }
-    
-    return(convstr)
-  }
   
   # Various observers 
   # Observer for changes in color input
@@ -579,416 +470,11 @@ server <- function(input, output, session) {
   plot_data <- reactive({
     
     req(input)
-    
-    ss <- agmip_csv()
-    colcount <- ncol(ss) - 2
-    cln <- colcount + 1
-    
-    for (i in 1:length(plot_levels())) {
-      # subsets for all plot levels used for input control. 
-      # Double brackets for input needed because it is a reactivevalues class
-      
-      #if(input$pngloop!=plot_levels()[i]){
-      if(!("All" %in% input[[plot_levels()[i]]])){ss <- subset(ss, ss[,plot_levels()[i]] %in% input[[plot_levels()[i]]])}
-      #}
-      if(!(plot_levels()[i] == "Year")) { # 
-        if(!("All" %in% input[[plot_levels()[i]]])){ss[,plot_levels()[i]] <- factor(ss[,plot_levels()[i]], levels=input[[plot_levels()[i]]])}
-      }   
-    }
-    
-    ss <- droplevels(ss) # necessary because empty levels might be left over after subsetting.
-    ss$Year = as.integer(as.character(ss$Year))
-    
-    if(input$Scaling == "2005 = 0"){
-      if ("index" %in% colnames(ss) & "value" %in% colnames(ss)){ss$index <- NULL}
-      ss <- spread(ss, Year, value)
-      ss[,cln:ncol(ss)] <- ss[,cln:ncol(ss)] - ss$'2005'
-      ss <- melt(ss, id.vars=1:colcount, variable_name="Year")
-      ss <- na.omit(ss)
-      ss$Year <- as.numeric(substr(ss$Year, 1, stop=100))
-    }
-    if(input$Scaling == "2010 = 0"){
-      if ("index" %in% colnames(ss) & "value" %in% colnames(ss)){ss$index <- NULL}
-      ss <- spread(ss, Year, value)
-      ss[,cln:ncol(ss)] <- ss[,cln:ncol(ss)] - ss$'2010'
-      ss <- melt(ss, id.vars=1:colcount, variable_name="Year")
-      ss <- na.omit(ss)
-      ss$Year <- as.numeric(substr(ss$Year, 1, stop=100))
-    }
-    if(input$Scaling == "index 2010 = 1"){
-      if ("index" %in% colnames(ss) & "value" %in% colnames(ss)){ss$index <- NULL}
-      ss <- spread(ss, Year, value)
-      ss[,cln:ncol(ss)] <- ss[,cln:ncol(ss)]/ss$'2010'
-      ss <- melt(ss, id.vars=1:colcount, variable_name="Year")
-      ss <- na.omit(ss)
-      ss$Year <- as.numeric(substr(ss$Year, 1, stop=100))
-    }
-    if(input$Scaling == "index 2005 = 1"){
-      if ("index" %in% colnames(ss) & "value" %in% colnames(ss)){ss$index <- NULL}
-      ss <- spread(ss, Year, value)
-      ss[,cln:ncol(ss)] <- ss[,cln:ncol(ss)]/ss$'2005'
-      ss <- melt(ss, id.vars=1:colcount, variable_name="Year")
-      ss <- na.omit(ss)
-      ss$Year <- as.numeric(substr(ss$Year, 1, stop=100))
-    }
-    
-    # if(input$LegendReverse) {
-    #   ss[,input$fill] <- factor(ss[,input$fill], rev(levels(ss[,input$fill])))
-    # }
-    if(input$Reverse_x_var) {
-      ss[,input$x_var] <- factor(ss[,input$x_var], rev(levels(ss[,input$x_var])))
-    }
-    
-    return(ss)
+    df <- agmip_csv()
+    df <- plot_data_wj(df,input)
+    return(df)
+  
   })
-  
-  # Plot building ====
-  
-  # plot_subset <- function(df, suffix){
-  #   
-  #   for (i in 1:length(plot_levels())) {
-  #     # subsets for all plot levels used for input control. 
-  #     # Double brackets for input needed because it is a reactivevalues class
-  #     in_name <- paste(plot_levels()[i],suffix, sep="")
-  #     col_name <- plot_levels()[i]
-  #     if(!("All" %in% input[[in_name]])){df <- subset(df, df[,col_name] %in% input[[in_name]])}
-  #   }
-  #   
-  #   colcount <- ncol(df) - 2
-  #   cln <- colcount + 1
-  #   
-  #   #df <- droplevels(df) # necesary because empty levels might be left over after subsetting.
-  #   df$Year = as.integer(as.character(df$Year))
-  #   
-  #   scaling = input[[paste("scaling", suffix, sep="")]]
-  #   yr = input[[paste("scalingyr", suffix, sep="")]]
-  #   nr = input[[paste("scalingnr", suffix, sep="")]]
-  #   scalingby = input[[paste("scalingby", suffix, sep="")]]
-  #   
-  #   scale = 0
-  #   if (scalingby != "" & scaling == "Absolute") {
-  #     rowvar <- unlist(strsplit(scalingby, ";"))[2]
-  #     col <- unlist(strsplit(scalingby, ";"))[1]
-  #     scale <- df[df[,col]==rowvar & df$Year == yr,]
-  #     scale = scale$value # will be multiple values in case of facets (or wrong input)
-  #   }
-  #   
-  #   if(scaling == "Absolute"){
-  #     if ("index" %in% colnames(df) & "value" %in% colnames(df)){
-  #       df$index <- NULL
-  #       cln = cln - 1
-  #       colcount = colcount - 1
-  #     }
-  #     df <- spread(df, Year, value)
-  #     if(scalingby != "" & input$Facet != "None") {
-  #       rows <- unique(df[,input$Facet])
-  #       for (i in 1:length(rows)) {
-  #         dfsub = subset(df, df[,input$Facet]==rows[i])
-  #         scale <- dfsub[dfsub[,col]==rowvar,]
-  #         scale = scale[,as.character(yr)]
-  #         dfsub[,cln:ncol(dfsub)] <- dfsub[,cln:ncol(dfsub)] - dfsub[,as.character(yr)] + scale
-  #         df <- rbind(dfsub, subset(df, df[,input$Facet]!=rows[i]))
-  #       }
-  #     } else {
-  #       df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)] + scale
-  #     }
-  #     df <- melt(df, id.vars=1:colcount, variable_name="Year")
-  #     df <- na.omit(df)
-  #     df$value <- df$value + nr
-  #     df$Year <- as.numeric(substr(df$Year, 1, stop=100))
-  #   }
-  #   if(scaling == "Relative"){
-  #     print(summary(df))
-  #     if ("index" %in% colnames(df) & "value" %in% colnames(df)){
-  #       df$index <- NULL
-  #       cln = cln - 1
-  #       colcount = colcount - 1
-  #     }
-  #     df <- spread(df, Year, value)
-  #     print(head(df))
-  #     df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df[,as.character(yr)]
-  #     df <- melt(df, id.vars=1:colcount, variable_name="Year")
-  #     df <- na.omit(df)
-  #     df$value <- df$value + nr
-  #     df$Year <- as.numeric(substr(df$Year, 1, stop=100))
-  #     print(summary(df))
-  #   }
-  #   
-  #   # for (i in 1:length(plot_levels())) {
-  #   #   if(!(plot_levels()[i] == "Year")) { 
-  #   #     in_name <- paste(plot_levels()[i],suffix, sep="")
-  #   #     col_name <- plot_levels()[i]
-  #   #     if(!("All" %in% input[[in_name]])){
-  #   #       df[,col_name] <- factor(df[,col_name], levels=input[[in_name]])
-  #   #     }
-  #   #   } 
-  #   # }
-  # #  if(!("All" %in% input[[plot_levels()[i]]])){
-  # #    ss[,plot_levels()[i]] <- factor(ss[,plot_levels()[i]], levels=input[[plot_levels()[i]]])}
-  #   
-  #   return(df) 
-  # }
-  # 
-  # plot_build_suf <- function(G1, df, suffix, chartopt) {
-  #   
-  #   alpha = input[[paste("alpha", suffix, sep="")]]
-  #   color = input[["color"]]
-  #   fill = input[["fill"]]
-  #   linetype = input[["linetype"]]
-  #   shape = input[["shape"]]
-  #   size = input[[paste("size", suffix, sep="")]]
-  #   width = input[[paste("barwidth", suffix, sep="")]]
-  #   dodgewidth=input[[paste("dodgewidth", suffix, sep="")]]
-  #   
-  #   singlecolorcheck = input[[paste("singlecolorcheck", suffix, sep="")]]
-  #   singlecolor = input[[paste("singlecolor", suffix, sep="")]]
-  #   
-  #   manualdata=eval(parse(text=input[[paste("manualdata", suffix, sep="")]]))
-  #   
-  #   G1 = G1 + aes_string(x=input$x_var, y=input$y_var)
-  #   if(linetype!="None"){G1 = G1 + aes_string(linetype=linetype)}
-  #   if(color!="None"){G1 = G1 + aes_string(color=color)}
-  #   if(shape!="None"){G1 = G1 + aes_string(shape=shape)}
-  #   if(fill!="None"){G1 = G1 + aes_string(fill=fill)}
-  #   
-  #   if(chartopt=="Line"){
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + geom_line(data=df,size=size, alpha=alpha, color=singlecolor)
-  #     } else {
-  #       G1 = G1 + geom_line(data=df,size=size, alpha=alpha)
-  #     }
-  #   } else if(chartopt=="Point"){
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + geom_point(data=df, size=size, alpha=alpha, color=singlecolor)
-  #     } else {
-  #       G1 = G1 + geom_point(data=df, size=size, alpha=alpha)
-  #     }
-  #   } else if (chartopt=="Bar" | chartopt=="Stacked bar"){
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + geom_bar(data=df,alpha=alpha, width=width,stat="identity", color=singlecolor, size=size,
-  #                          position=if(dodgewidth==0){"stack"}else{position_dodge(dodgewidth)})
-  #     } else {
-  #       G1 = G1 + geom_bar(data=df,alpha=alpha,width=width,stat="identity",size=size,
-  #                          position=if(dodgewidth==0){"stack"}else{position_dodge(dodgewidth)})
-  #     }
-  #   } else if(chartopt=="Area") {
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + geom_area(data=df, alpha=alpha, color=singlecolor)
-  #     } else {
-  #       G1 = G1 + geom_area(data=df, alpha=alpha)
-  #     }
-  #   } else if(chartopt=="Ribbon") {
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + list(stat_summary(aes_string(x=input$x_var, y=input$y_var,fill=fill), data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA, inherit.aes = FALSE))
-  #     } else {
-  #       G1 = G1 + list(stat_summary(aes_string(x=input$x_var, y=input$y_var, fill=fill), data=df,geom="ribbon", fun.ymin="min", fun.ymax="max", alpha=alpha, colour=NA, inherit.aes = FALSE))
-  #     }
-  #   } else if(chartopt=="geom_vline"){
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + geom_vline(xintercept=manualdata,alpha=alpha, size=size,colour=singlecolor)
-  #     } else {
-  #       G1 = G1 + geom_vline(xintercept=manualdata,size=size, alpha=alpha)
-  #     }
-  #   } else if(chartopt=="geom_hline"){
-  #     if(singlecolorcheck) {
-  #       G1 = G1 + geom_hline(yintercept=manualdata,alpha=alpha, size=size,colour=singlecolor)
-  #     } else {
-  #       G1 = G1 + geom_hline(yintercept=manualdata,size=size, alpha=alpha)
-  #     }
-  #   }
-  #   
-  #   return(G1)
-  # }
-  # 
-  # 
-  # plot_build_init <- function() {
-  #   # Labels and stuff
-  #   G1 = ggplot(data=plot_data())
-  #   
-  #   col_labels <- input$colorlabels
-  #  
-  #   if (col_labels!=""){
-  #     col_labels <- unlist(strsplit(col_labels, ";"))
-  #     G1 = G1 + scale_color_manual(values=colorset(), labels=col_labels) 
-  #   } else {
-  #     G1 = G1 + scale_color_manual(values=colorset()) 
-  #   }
-  #   
-  #   labels <- input$scale_x_discretelabels
-  #   if (labels!=""){
-  #     labels <- unlist(strsplit(labels, ";"))
-  #     G1 = G1 +  scale_x_discrete(labels=labels) 
-  #   } 
-  #   
-  #   labels <- input$linetypelabels
-  #   if (labels!=""){
-  #     labels <- unlist(strsplit(labels, ";"))
-  #     G1 = G1 + scale_linetype(labels=labels) 
-  #   } 
-  #   
-  #   labels <- input$filllabels
-  #   if (labels!=""){
-  #     labels <- unlist(strsplit(labels, ";"))
-  #     G1 = G1 + scale_fill_manual(values=colorset(), labels=labels) 
-  #   } else {
-  #     G1 = G1 + scale_fill_manual(values=colorset())
-  #   }
-  #   
-  #   labels <- input$shapelabels
-  #   if (labels!=""){
-  #     labels <- unlist(strsplit(labels, ";"))
-  #     G1 = G1 + scale_shape(labels=labels, solid=FALSE) 
-  #   } else {
-  #     G1 = G1 + scale_shape(solid=FALSE)
-  #   }
-  #   
-  #   if(input$ylabpercent){
-  #     G1 = G1 + scale_y_continuous(labels=scales::percent) 
-  #   }
-  # 
-  #   return(G1)
-  # }
-  # 
-  # plot_build_theme <- function(G1) {
-  #   
-  # 
-  #   if(input$themeopt=="theme_bw"){G1 = G1 + theme_bw(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_classic"){G1 = G1 + theme_classic(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_dark"){G1 = G1 + theme_dark(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_gray"){G1 = G1 + theme_gray(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_light"){G1 = G1 + theme_light(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_linedraw"){G1 = G1 + theme_linedraw(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_minimal"){G1 = G1 + theme_minimal(base_size=14+input$TextSize)}
-  #   if(input$themeopt=="theme_void"){G1 = G1 + theme_void(base_size=14+input$TextSize)}
-  #   
-  #   
-  #   if(input$aspect_ratio > 0) {G1 = G1 + theme(aspect.ratio = input$aspect_ratio)}
-  #   # G1 = G1 +
-  #   #   theme(
-  #   #     #panel.background = element_rect(fill = 'white', color = 'black'),
-  #   #     #axis.ticks.x = element_blank(),
-  #   #     axis.ticks.y = element_blank(),
-  #   # 
-  #   #     panel.grid.major.x=element_blank(),
-  #   #     panel.grid.minor.x=element_blank(),
-  #   #     panel.grid.minor.y=element_blank())
-  # 
-  #   G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left")
-  #   
-  #   if(input$xlabrotate){G1 = G1 + theme(axis.text.x = element_text(angle=90, hjust=1, vjust =0.5))}
-  #   
-  #  # axis.line =         theme_blank(),
-  # #  axis.text.x =       theme_text(size = base_size * 0.8 , lineheight = 0.9, colour = "grey50", vjust = 1),
-  # #  axis.text.y =       theme_text(size = base_size * 0.8, lineheight = 0.9, colour = "grey50", hjust = 1),
-  #   # axis.ticks =        theme_segment(colour = "grey50"),
-  #   # axis.title.x =      theme_text(size = base_size, vjust = 0.5),
-  #   # axis.title.y =      theme_text(size = base_size, angle = 90, vjust = 0.5),
-  #   # axis.ticks.length = unit(0.15, "cm"),
-  #   # axis.ticks.margin = unit(0.1, "cm"),
-  #   
-  #   # legend.background = theme_rect(colour="white"), 
-  #   # legend.key =        theme_rect(fill = "grey95", colour = "white"),
-  #   # legend.key.size =   unit(1.2, "lines"),
-  #   # legend.text =       theme_text(size = base_size * 0.8),
-  #   # legend.title =      theme_text(size = base_size * 0.8, face = "bold", hjust = 0),
-  #   # legend.position =   "right",
-  #   
-  #   G1=G1+theme(panel.background = element_rect(fill=input$panel.background.color))    
-  #   # panel.background =  theme_rect(fill = "grey90", colour = NA), 
-  #   # panel.border =      theme_blank(), 
-  #   # panel.grid.major.x =  theme_line(colour = "white"),
-  #   # panel.grid.minor.x =  theme_line(colour = "grey95", size = 0.25),
-  #   if(input$panel.grid.major.x>0){G1=G1+theme(panel.grid.major.x = element_line(size=input$panel.grid.major.x, color=input$panel.grid.color))}
-  #   if(input$panel.grid.major.y>0){G1=G1+theme(panel.grid.major.y = element_line(size=input$panel.grid.major.y, color=input$panel.grid.color))}
-  #   if(input$panel.grid.major.y>0 & input$panel.grid.major.x>0){G1=G1+theme(panel.grid.major = element_line(size=max(input$panel.grid.major.y,input$panel.grid.major.x, color=input$panel.grid.color)))}
-  #   if(input$panel.grid.minor.x>0){G1=G1+theme(panel.grid.minor.x = element_line(size=input$panel.grid.minor.x, color=input$panel.grid.color))}
-  #   if(input$panel.grid.minor.y>0){G1=G1+theme(panel.grid.minor.y = element_line(size=input$panel.grid.minor.y, color=input$panel.grid.color))}
-  #   if(input$panel.grid.minor.y>0 & input$panel.grid.minor.x>0){G1=G1+theme(panel.grid.minor = element_line(size=max(input$panel.grid.minor.y,input$panel.grid.minor.x, color=input$panel.grid.color)))}
-  #   # panel.margin =      unit(0.25, "lines"),
-  #   # 
-  #   # strip.background =  theme_rect(fill = "grey80", colour = NA), 
-  #   # strip.text.x =      theme_text(size = base_size * 0.8),
-  #   # strip.text.y =      theme_text(size = base_size * 0.8, angle = -90),
-  #   # 
-  #   #plot.background =   theme_rect(colour = NA, fill = "white"),
-  #   #plot.title =        theme_text(size = base_size * 1.2),
-  #   #plot.margin =       unit(c(1, 1, 0.5, 0.5), "lines")
-  #   
-  #   return(G1)
-  #   
-  # }  
-  #   
-  # plot_build <- function(df){
-  #   
-  #   if(nrow(df)==0){return(NULL)}
-  #   
-  #   if(input$factor_xvar){df[,input$x_var] <-factor(df[,input$x_var])}
-  #   
-  #   G1 =  plot_build_init()
-  #   for (i in 1:input$nr_of_plots) {
-  #     chartopt = input[[paste("chart", i, sep="")]]
-  #     if(!is.null(chartopt)) {
-  #       if(chartopt!="None") {
-  #         G1 = G1 %>% plot_build_suf(plot_subset(df, i), i, chartopt)
-  #       }
-  #     }
-  #   }
-  #   G1 =  G1 %>% plot_build_theme()
-  # 
-  #   # if (input$Chart == "Tornado"){
-  #   #   tornadata <- spread_(df, input$Tornado, "value")
-  #   # 
-  #   #   G1 = ggplot(tornadata, aes_string(x = input$x_var, y="FstOrdEff", fill = input$fill)) +
-  #   #     geom_bar(data=tornadata, width=.8, alpha = 0.5, stat="identity", position=position_dodge(width=0.9))+
-  #   #     geom_bar(data=tornadata, width=0.45, alpha = 1, aes_string(x="Var", y="TotOrdEff"),stat="identity", position=position_dodge(width=0.9)) +
-  #   #     geom_bar(data=tornadata, width=0.8, alpha = 0.2, aes_string(x="Var", y="IntEff"), stat="identity", position=position_dodge(width=0.9)) +
-  #   #     geom_vline(xintercept=seq(1.5, 7.5, 1), colour='black')
-  #   #   G1 <- G1 + scale_y_continuous(labels=percent) 
-  #   # } 
-  #   # if (input$Chart == "Boxplot") {
-  #   #   G1 = G1 + geom_boxplot(outlier.shape=46)
-  #   #   G1 = G1 + geom_point(data=df,aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point), size=3) + scale_shape(solid = FALSE) 
-  #   #   G1 = G1 + geom_hline(yintercept=0, colour='grey20')
-  #   #   G1 <- G1 + scale_y_continuous(labels=percent)
-  #   #   } 
-  #     
-  #   # if(input$summary & "Scenario" %in% plot_levels()) {
-  #   #   scen_range <- scenario_range(df, 2050)
-  #   #   G1 = G1 + stat_summary(data = scen_range,geom="linerange", fun.ymax=max, fun.ymin=min, aes_string(colour=input$fill),alpha=0.12,show.legend=FALSE,size=2)
-  #   #   G1 = G1 + geom_point(data=scen_range,aes_string(x=input$x_var, y=input$y_var, colour=input$fill, pch=input$point), size=3) + scale_shape(solid = FALSE) 
-  #   # }
-  #   
-  #   if(input$title!=""){G1 = G1 + ggtitle(stringconvert(convstr = input$title, df))} 
-  #   if(input$xlab!=""){G1 = G1 + xlab(stringconvert(convstr = input$xlab, df))} 
-  #   if(input$ylab!=""){G1 = G1 + ylab(stringconvert(convstr = input$ylab, df))} 
-  #   
-  #   if (input$xman){G1 <- G1 + xlim(input$xmin, input$xmax)}  
-  #   if (input$yman){G1 <- G1 + ylim(input$ymin, if(input$ymin<input$ymax){input$ymax}else{NA})}
-  #   
-  #   if (!is.null(input$Facet)) {
-  #     if (input$Facet!="None" & input$Facet2=="None"){
-  #       G1 <- G1 + facet_wrap(as.formula(paste("~", input$Facet)),
-  #                             ncol=input$ncol, 
-  #                             scales = input$scales)
-  #     } else if (input$Facet!="None" & input$Facet2!="None"){
-  #       if (input$facet_grid) {
-  #         G1 <- G1 + facet_grid(as.formula(paste(input$Facet2, "~", input$Facet)),
-  #                               scales = input$scales)
-  #       }else{
-  #         G1 <- G1 + facet_wrap(as.formula(paste(input$Facet2, "~", input$Facet)),
-  #                               ncol=input$ncol,
-  #                               scales = input$scales)
-  #       }
-  #     }
-  #   }
-  #   if(input$flip){G1 <- G1 + coord_flip()}
-  #   if(input$polar){G1 <- G1 + coord_polar()}
-  #   
-  #   #This adds anything in input$plot_text_add interpreted as parsed formulas
-  #   eval(parse(text=input$plot_text_add))
-  # 
-  #   return(G1)
-  # }
   
   #Outputs and rendering --------
   output$plot1 <- renderPlot({
@@ -1018,46 +504,65 @@ server <- function(input, output, session) {
   
   output$coderecycle <- renderText({
     
+    default_input <-list(themeopt='theme_classic',aspect_ratio=0,scale_x_discretelabels='',Model10='All',panel.grid.major.x=0,panel.grid.major.y=0,Scenario1='FAO baseline',Scenario2='FAO baseline',Scenario3='FAO baseline',fill='Item',Scenario4='FAO baseline',Region='All',Scenario5='FAO baseline',Scenario6='FAO baseline',Scenario7='FAO baseline',LegendPosition='right',Scenario8='FAO baseline',Scenario9='FAO baseline',scaling10='None',scalingnr10=0,flip=FALSE,dropfilllabels=TRUE,ylabpercent=FALSE,ymin=0,Scaling='None',Variable='All',Facet2='None',color='Model',barwidth1=0.8,barwidth2=0.8,barwidth3=0.8,LegendReverse=FALSE,barwidth4=0.8,barwidth5=0.8,barwidth6=0.8,barwidth7=0.8,barwidth8=0.8,barwidth9=0.8,x_var='Year',colour_preset='None',panel.grid.minor.x=0,panel.grid.minor.y=0,shiftx1=0,TextSize=0,shiftx2=0,shiftx3=0,shiftx4=0,Variable1='AREA',shiftx5=0,Variable2='AREA',shiftx6=0,Variable3='AREA',shiftx7=0,Variable4='AREA',shiftx8=0,Variable5='AREA',scaling1='None',shiftx9=0,Variable6='AREA',scaling2='None',xlab='',Variable7='AREA',scaling3='None',Variable8='AREA',scaling4='None',Variable9='AREA',scaling5='None',scaling6='None',colorlabels='',scaling7='None',scaling8='None',Year='All',manualdata1='',scaling9='None',manualdata2='',manualdata3='',manualdata4='',manualdata5='',Item='All',manualdata6='',manualdata7='',singlecolorcheck10=FALSE,manualdata8='',manualdata9='',Model1='All',Model2='All',Model3='All',filllabels='',Model4='All',settings_opt='None',Model5='All',Region1='World',Model6='All',plot_text_add='',Region2='World',Model7='All',Region3='World',Model8='All',Region4='World',Model9='All',title='',scalingnr1=0,Region5='World',xman=FALSE,Facet='None',scalingnr2=0,Region6='World',dodgewidth1=0,scalingnr3=0,Region7='World',dodgewidth2=0,scalingnr4=0,Region8='World',dodgewidth3=0,scalingnr5=0,Region9='World',dodgewidth4=0,scalingnr6=0,dodgewidth5=0,scalingnr7=0,dodgewidth6=0,scalingnr8=0,dodgewidth7=0,scales='free',scalingnr9=0,dodgewidth8=0,value='All',dodgewidth9=0,xmax=2050,Scenario='All',barwidth10=0.8,colour_list='',value10='All',ncol=2,ylab='',nr_of_plots=10,Year10='All',factor_xvar=FALSE,scalingby10='',shiftx10=0,scalingyr10=2010,size10=1.5,ChartHeight=400,colour_reverse=FALSE,Year1='All',Year2='All',Year3='All',Year4='All',Year5='All',Year6='All',y_var='value',Year7='All',Year8='All',Year9='All',pngbutton=0,ChartWidth=500,xlabrotate=FALSE,manualdata10='',yman=FALSE,panel.grid.color='#E0E0E0',ymax=0,shape='Scenario',scalingby1='',scalingby2='',scalingby3='',dodgewidth10=0,scalingby4='',scalingby5='',scalingby6='',scalingby7='',scalingby8='',scalingby9='',singlecolorcheck1=FALSE,singlecolorcheck2=FALSE,singlecolorcheck3=FALSE,singlecolorcheck4=FALSE,tabs='Main',singlecolorcheck5=FALSE,singlecolorcheck6=FALSE,singlecolorcheck7=FALSE,singlecolorcheck8=FALSE,singlecolorcheck9=FALSE,value1='All',Scenario10='FAO baseline',Reverse_x_var=FALSE,value2='All',value3='All',value4='All',value5='All',value6='All',value7='All',value8='All',value9='All',scalingyr1=2010,size1=1.5,Variable10='AREA',scalingyr2=2010,size2=1.5,scalingyr3=2010,size3=1.5,scalingyr4=2010,size4=1.5,scalingyr5=2010,size5=1.5,Region10='World',scalingyr6=2010,size6=1.5,c1='#00FF00',scalingyr7=2010,size7=1.5,pngloop='Variable',c2='#0000FF',scalingyr8=2010,size8=1.5,linetype='Region',c3='#FF0000',scalingyr9=2010,size9=1.5,c4='#FFB900',c5='#FF00FF',c6='#00FF80',c7='#00FFFF',c8='#0080FF',c9='#0000FF',singlecolor1='#000000',singlecolor2='#000000',singlecolor3='#000000',singlecolor4='#000000',singlecolor5='#000000',singlecolor6='#000000',Item1='CGR',singlecolor7='#000000',alpha10=1,Item10='CGR',chart10='None',facet_grid=FALSE,Item2='CGR',singlecolor8='#000000',update_settings=0,Item3='CGR',singlecolor9='#000000',shapelabels='',Item4='CGR',Item5='CGR',Item6='CGR',Item7='CGR',Item8='CGR',Model='All',linetypelabels='',Item9='CGR',alpha1=1,chart1='Line',polar=FALSE,alpha2=1,dataset='Combined_yield_data.csv',chart2='None',alpha3=1,chart3='None',alpha4=1,chart4='None',alpha5=1,chart5='None',alpha6=1,xmin=2010,chart6='None',alpha7=1,chart7='None',c10='#8000FF',singlecolor10='#000000',alpha8=1,chart8='None',c11='#FF00FF',alpha9=1,chart9='None',panel.background.color='#FFFFFF',c12='#FF0080')
+    
     inp <- reactiveValuesToList(input)
+    inp$file1 <- NULL # removing to avoid errors (is a null element)
+    inp$tabs <- NULL
+    inp$settingstabs <- NULL
    # inp <- deparse(inp)
     
-    txt = "input<-list()\n"
+    txt = "default_input <-list(themeopt='theme_classic',aspect_ratio=0,scale_x_discretelabels='',Model10='All',panel.grid.major.x=0,panel.grid.major.y=0,Scenario1='FAO baseline',Scenario2='FAO baseline',file1=NULL,Scenario3='FAO baseline',fill='Item',Scenario4='FAO baseline',Region='All',Scenario5='FAO baseline',Scenario6='FAO baseline',Scenario7='FAO baseline',LegendPosition='right',Scenario8='FAO baseline',Scenario9='FAO baseline',scaling10='None',scalingnr10=0,flip=FALSE,dropfilllabels=TRUE,ylabpercent=FALSE,ymin=0,Scaling='None',Variable='All',Facet2='None',color='Model',barwidth1=0.8,barwidth2=0.8,barwidth3=0.8,LegendReverse=FALSE,barwidth4=0.8,barwidth5=0.8,barwidth6=0.8,barwidth7=0.8,barwidth8=0.8,barwidth9=0.8,x_var='Year',colour_preset='None',panel.grid.minor.x=0,panel.grid.minor.y=0,shiftx1=0,TextSize=0,shiftx2=0,shiftx3=0,shiftx4=0,Variable1='AREA',shiftx5=0,Variable2='AREA',shiftx6=0,Variable3='AREA',shiftx7=0,Variable4='AREA',shiftx8=0,Variable5='AREA',scaling1='None',shiftx9=0,Variable6='AREA',scaling2='None',xlab='',Variable7='AREA',scaling3='None',Variable8='AREA',scaling4='None',Variable9='AREA',scaling5='None',scaling6='None',colorlabels='',scaling7='None',scaling8='None',Year='All',manualdata1='',scaling9='None',manualdata2='',manualdata3='',manualdata4='',manualdata5='',Item='All',manualdata6='',manualdata7='',singlecolorcheck10=FALSE,manualdata8='',manualdata9='',Model1='All',Model2='All',Model3='All',filllabels='',Model4='All',settings_opt='None',Model5='All',Region1='World',Model6='All',plot_text_add='',Region2='World',Model7='All',Region3='World',Model8='All',Region4='World',Model9='All',title='',scalingnr1=0,Region5='World',xman=FALSE,Facet='None',scalingnr2=0,Region6='World',dodgewidth1=0,scalingnr3=0,Region7='World',dodgewidth2=0,scalingnr4=0,Region8='World',dodgewidth3=0,scalingnr5=0,Region9='World',dodgewidth4=0,scalingnr6=0,dodgewidth5=0,scalingnr7=0,dodgewidth6=0,scalingnr8=0,dodgewidth7=0,scales='free',scalingnr9=0,dodgewidth8=0,value='All',dodgewidth9=0,xmax=2050,Scenario='All',barwidth10=0.8,colour_list='',value10='All',ncol=2,ylab='',nr_of_plots=10,Year10='All',factor_xvar=FALSE,scalingby10='',shiftx10=0,scalingyr10=2010,size10=1.5,ChartHeight=400,colour_reverse=FALSE,Year1='All',Year2='All',Year3='All',Year4='All',Year5='All',Year6='All',y_var='value',Year7='All',Year8='All',Year9='All',pngbutton=0,ChartWidth=500,xlabrotate=FALSE,manualdata10='',yman=FALSE,panel.grid.color='#E0E0E0',ymax=0,shape='Scenario',scalingby1='',scalingby2='',scalingby3='',dodgewidth10=0,scalingby4='',scalingby5='',scalingby6='',scalingby7='',scalingby8='',scalingby9='',singlecolorcheck1=FALSE,singlecolorcheck2=FALSE,singlecolorcheck3=FALSE,singlecolorcheck4=FALSE,singlecolorcheck5=FALSE,singlecolorcheck6=FALSE,singlecolorcheck7=FALSE,singlecolorcheck8=FALSE,singlecolorcheck9=FALSE,value1='All',Scenario10='FAO baseline',Reverse_x_var=FALSE,value2='All',value3='All',value4='All',value5='All',value6='All',value7='All',value8='All',value9='All',scalingyr1=2010,size1=1.5,Variable10='AREA',scalingyr2=2010,size2=1.5,scalingyr3=2010,size3=1.5,scalingyr4=2010,size4=1.5,scalingyr5=2010,size5=1.5,Region10='World',scalingyr6=2010,size6=1.5,c1='#00FF00',scalingyr7=2010,size7=1.5,pngloop='Variable',c2='#0000FF',scalingyr8=2010,size8=1.5,linetype='Region',c3='#FF0000',scalingyr9=2010,size9=1.5,c4='#FFB900',c5='#FF00FF',c6='#00FF80',c7='#00FFFF',c8='#0080FF',c9='#0000FF',singlecolor1='#000000',singlecolor2='#000000',singlecolor3='#000000',singlecolor4='#000000',singlecolor5='#000000',singlecolor6='#000000',Item1='CGR',singlecolor7='#000000',alpha10=1,Item10='CGR',chart10='None',facet_grid=FALSE,Item2='CGR',singlecolor8='#000000',update_settings=0,Item3='CGR',singlecolor9='#000000',shapelabels='',Item4='CGR',Item5='CGR',Item6='CGR',Item7='CGR',Item8='CGR',Model='All',linetypelabels='',Item9='CGR',alpha1=1,chart1='Line',polar=FALSE,alpha2=1,dataset='Combined_yield_data.csv',chart2='None',alpha3=1,chart3='None',alpha4=1,chart4='None',alpha5=1,chart5='None',alpha6=1,xmin=2010,chart6='None',alpha7=1,chart7='None',c10='#8000FF',singlecolor10='#000000',alpha8=1,chart8='None',c11='#FF00FF',alpha9=1,chart9='None',panel.background.color='#FFFFFF',c12='#FF0080')\n"
+    
+    txt = paste(txt,"input<-default_input\n",sep="")
     
     for (i in 1:length(inp)){
       #txt <- paste(txt, inp[i],sep="")
-      
-     if(is.character(unlist(inp[i])) & length(unlist(inp[i]))==1){
-       s <- "'"}
-      else{
-        s<-""
+     name = names(inp)[i]
+   
+     check = FALSE
+     if(is.null(default_input[[name]])) {
+       check = TRUE
+     } else if (inp[[name]]!=default_input[[name]]){
+       check = TRUE 
+     }
+     if (check) {
+       if(is.character(unlist(inp[i])) & length(unlist(inp[i]))==1){
+         s <- "'"}
+        else{
+          s<-""
+        }
+        txt <- paste(txt, "input$",names(inp)[i], "<-",s,inp[i],s,"\n",sep="")
       }
-      txt <- paste(txt, "input$",names(inp)[i], "<-",s,inp[i],s,"\n",sep="")
     }
     wd <- getwd()
+    fname = paste(wd,datapath,input$dataset,sep='/')
     txt <- paste(txt, "\nsetwd('",wd, "')
-# load dataframe (df)
 source('./plot_build.R')
-load('shinyplotdata.rda')
+fname='",fname,"'
+DATA <- read.csv(fname, sep=',', dec='.')
+DATA <- data_cleaner(DATA)
+df <- plot_data_wj(DATA, input)
 shiny_plot <- plot_build_wj(df,input)
 
 
 res=72 #Defult resolution used to calculate proper height of graph output.
 ggsave('plot.png', plot = shiny_plot, width=input$ChartWidth/res, height=input$ChartHeight/res)
-                 
+namepref = '' # adds prefix to filename
 #input$pngloop <- 'Item'
 lp <- unique(df[,input$pngloop])
 for (i in 1:length(lp)) {
    ss <- subset(df, df[,input$pngloop] == lp[i])
    shiny_plot <- plot_build_wj(ss,input)
    if(input$title==''){
-     plotname <- paste(gsub('%', '',gsub('/', '_',lp[i])))
-   } else {
-     plotname <- stringconvert(input$title, ss, input)
+    plotname <- paste(namepref,gsub('%', '',gsub('/', '_',lp[i])),sep='')
+  } else {
+   plotname <- paste(namepref, stringconvert(input$title, ss, input),sep='')
    }
    ggsave(paste(plotname, '.png'), shiny_plot, , width=input$ChartWidth/res, height=input$ChartHeight/res)
 }
 ", sep="")
-    writeClipboard(txt)
+      
     # txt <- "input <- list("
     # for (i in 1:length(inp)) {
     #    txt <- paste(txt, names(inp)[i], "=", inp[i], sep="")
@@ -1081,7 +586,7 @@ for (i in 1:length(lp)) {
     
     filename = function(){
       if(input$title==''){
-        plotname <- paste(gsub('%', '',gsub('/', '_',lp[i]))) 
+        plotname <- "plot.png"
       } else {
         plotname <- stringconvert(input$title, ss, input) 
       }
@@ -1186,7 +691,7 @@ for (i in 1:length(lp)) {
       updateQueryString(url)
     })
 }
-options(shiny.port=5903)
+# options(shiny.port=5903)
 # Run the application  ----
 shinyApp(ui = ui, server = server, enableBookmarking = "url")
 
