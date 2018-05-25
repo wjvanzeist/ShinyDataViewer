@@ -134,7 +134,7 @@ ui <- function(request) {
         selected = "Chart1" #ACtivates main panel
       )
     ),
-    mainPanel(style = "overflow-y:scroll",
+    mainPanel(
       tabsetPanel(id="settingstabs",
         tabPanel("Data & settings",
                  p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
@@ -299,7 +299,11 @@ server <- function(input, output, session) {
         in_name <- paste(colnames(agmip_csv())[i], suffix, sep="")
       
         in_selected <- "All" # Default is all
-        if (in_name %like% "Region"){in_selected <- "World"}
+        if ("WLD" %in% in_choices) {
+          in_selected <- "WLD"
+        } else {
+          in_selected <- "World"
+        }
         if (in_name %like% "Scenario"){in_selected <- levels(agmip_csv()[1,i])[1]}
         if (in_name %like% "Variable" & !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]} 
         if (in_name %like% "Item"& !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]}
