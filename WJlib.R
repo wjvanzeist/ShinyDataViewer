@@ -136,7 +136,11 @@ data_cleaner <- function(df){
   }
   if ("Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
     # To do, make uppercase
-    # df$Variable = gsub("Area", "AREA", df$Region)
+    df$Variable = gsub("^Area$", "AREA", df$Variable)
+    df$Variable = gsub("^Prod$", "PROD", df$Variable)
+    df$Variable = gsub("^Feed$", "FEED", df$Variable)
+    df$Variable = gsub("^food$", "FOOD", df$Variable)
+    df$Variable = gsub("^Food$", "FOOD", df$Variable)
     # df$Variable = gsub("Area", "AREA", df$Region)
     # df$Variable = gsub("Area", "AREA", df$Region)
   }
@@ -144,10 +148,9 @@ data_cleaner <- function(df){
   #some general renaming
   if("Region" %in% colnames(df)){
     df$Region = gsub("R5.2", "", df$Region)
-    df$Region = gsub("Global", "World", df$Region)
-    df$Region = gsub("WLD", "World", df$Region)
-    df$Region = gsub("Global", "World", df$Region)
-    df$Region = gsub("Total", "World", df$Region)
+    df$Region = gsub("Global", "WLD", df$Region)
+    df$Region = gsub("^World$", "WLD", df$Region)
+    df$Region = gsub("Total", "WLD", df$Region)
   }
   if("Unit" %in% colnames(df)){
     df$Unit = gsub("Mt CO2e", "MtCO2e",df$Unit)

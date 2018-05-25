@@ -193,7 +193,7 @@ colorset <- function(df,input) {
   
   if (input$color!="None") {
     if (length(levels(df[,input$color])) > length(cset)) {
-      cset <- c(cset, rainbow(length(levels(df[,input$fill]))-length(cset)))
+      cset <- c(cset, rainbow(length(levels(df[,input$color]))-length(cset)))
     }
     return(cset)
   }
@@ -471,6 +471,7 @@ plot_build_suf <- function(G1, df, suffix, chartopt, input) {
 
 plot_build_init <- function(df, input) {
   # Labels and stuff
+  #functext = "G1 = ggplot(data=df)"
   G1 = ggplot(data=df)
   
   col_labels <- input$colorlabels
@@ -479,7 +480,15 @@ plot_build_init <- function(df, input) {
     col_labels <- unlist(strsplit(col_labels, ";"))
     G1 = G1 + scale_color_manual(values=colorset(df, input), labels=col_labels) 
   } else {
-    G1 = G1 + scale_color_manual(values=colorset(df, input)) 
+    
+    test <- scale_color_manual(values=colorset(df, input))
+    print()
+    G1 = G1 + test
+    #functext <- paste(functext, "G1 = G1 + scale_color_manual(values=colorset(df, input))", sep="\n")
+    # print(functext)
+    # eval (parse(text=functext))
+    # print(deparse(parse(text=functext)))
+    #G1 = G1 + scale_color_manual(values=colorset(df, input)) 
   }
   
   labels <- input$scale_x_discretelabels
