@@ -297,7 +297,7 @@ server <- function(input, output, session) {
           in_choices <- c("All",levels(agmip_csv()[,i]))
         }
         in_name <- paste(colnames(agmip_csv())[i], suffix, sep="")
-      
+     
         in_selected <- "All" # Default is all
         if (in_name %like% "Region"){
           if ("WLD" %in% in_choices) {
