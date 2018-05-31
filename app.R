@@ -299,12 +299,10 @@ server <- function(input, output, session) {
         in_name <- paste(colnames(agmip_csv())[i], suffix, sep="")
      
         in_selected <- "All" # Default is all
-        if (in_name %like% "Region"){
-          if ("WLD" %in% in_choices) {
-            in_selected <- "WLD"
-          } else {
-            in_selected <- "World"
-          }
+        if ("WLD" %in% in_choices) {
+          in_selected <- "WLD"
+        } else {
+          in_selected <- "World"
         }
         if (in_name %like% "Scenario"){in_selected <- levels(agmip_csv()[1,i])[1]}
         if (in_name %like% "Variable" & !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]} 
