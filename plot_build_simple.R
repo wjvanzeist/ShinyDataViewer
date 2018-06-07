@@ -45,100 +45,6 @@ plot_data_wj <- function(df,input){
   return(df)
 }
 
-# data_cleaner <- function(df){
-#   
-#   #Multiple claenup of names/headers units, etc.
-#   #Also tries to detect years in column names to convert to long format
-#   #Creates AgMIP item & variable columns if detected
-#   
-#   #Renaming some columns
-#   df <- plyr::rename(df, c("region"="Region", "model"="Model", "variable"="Variable", "scenario"="Scenario", "year"="Year", "unit"="Unit", "item"="Item"), warn_missing=FALSE)
-#   df <- plyr::rename(df, c("Index"="index", "Value"="value"), warn_missing=FALSE)
-#   df <- plyr::rename(df, c("REGION"="Region", "MODEL"="Model", "VARIABLE"="Variable", "SCENARIO"="Scenario", "YEAR"="Year", "UNIT"="Unit", "ITEM"="Item"), warn_missing=FALSE)
-#   df <- plyr::rename(df, c("INDEX"="index", "INDEX"="value"), warn_missing=FALSE)
-#   
-#   #converting years if found
-#   if (!("Year" %in% colnames(df))){
-#     if ("X2010" %in% colnames(df)|"X2005" %in% colnames(df)|"X2015" %in% colnames(df)|"X2000" %in% colnames(df)) {
-#       for (i in 1970:2100) { # finding first year occurrence.
-#         clnr = match(paste("X", i, sep=""), colnames(df), nomatch = 0)
-#         if (clnr != 0) {break}
-#       }
-#       df <- melt(df, id=1:clnr-1, variable_name = "Year")
-#       df$Year = as.numeric(substr(df$Year, 2, stop=100))      
-#     }
-#   }
-# 
-#   # Just to be sure, not sure if all of the below is necessary.
-#   if("value" %in% colnames(df)) {
-#     df$value <- as.numeric(substr(df$value, 1, stop=100))
-#   }
-#   if("index" %in% colnames(df)){
-#     df$index <- as.numeric(df$index)
-#   }
-#   if("Year" %in% colnames(df)) {
-#     df$Year = as.integer(as.character(df$Year))
-#   }
-#   
-#   #Making agmip columsn ig "AGMIP| etc is detected
-#   if("Variable" %in% colnames(df)) {
-#     if (!("Item" %in% colnames(df)) & substr(df$Variable[1],1,5) == "AGMIP") {
-#       df$Variable <- gsub("AGMIP|", "", df$Variable, fixed=TRUE)
-#       df$Item <- gsub("\\|.*", "", df$Variable) # Everything after | removed
-#       df$Variable <- gsub(".*\\|", "", df$Variable)
-#     }
-#   }
-#   
-#   if ("Unit" %in% colnames(df) & "Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
-#     df$Variable_AgMIP <- factor(paste(df$Variable ,"_", df$Item, "_", df$Unit, sep=""))
-#   }
-#   if ("Variable" %in% colnames(df) & "Item" %in% colnames(df) ) {
-#     # To do, make uppercase
-#     # df$Variable = gsub("Area", "AREA", df$Region)
-#     # df$Variable = gsub("Area", "AREA", df$Region)
-#     # df$Variable = gsub("Area", "AREA", df$Region)
-#   }
-#   
-#   #some general renaming
-#   if("Region" %in% colnames(df)){
-#     df$Region = gsub("R5.2", "", df$Region)
-#     df$Region = gsub("Global", "World", df$Region)
-#     df$Region = gsub("WLD", "World", df$Region)
-#     df$Region = gsub("Global", "World", df$Region)
-#     df$Region = gsub("Total", "World", df$Region)
-#   }
-#   if("Unit" %in% colnames(df)){
-#     df$Unit = gsub("Mt CO2e", "MtCO2e",df$Unit)
-#     df$Unit = gsub("kcal/cap/day", "kcal/cap/d",df$Unit)
-#   }
-#   if("Item" %in% colnames(df)){
-#     df$Item = gsub("wheat", "Wheat", df$Item)
-#     df$Item = gsub("barley", "Barley", df$Item)
-#     df$Item = gsub("maize", "Maize", df$Item)
-#     df$Item = gsub("oats", "Oats", df$Item)
-#     df$Item = gsub("rice", "Rice", df$Item)
-#     df$Item = gsub("rye", "Rye", df$Item)
-#     df$Item = gsub("millet", "Millet", df$Item)
-#     df$Item = gsub("sorghum", "Sorghum", df$Item)
-#   #  df$Item = gsub("Cereals", "Cereal", df$Item)
-#   }
-#   
-#   df = na.omit(df)
-#   
-#   #This makes sure that all non-numeric columns are factorized.
-#   df <- df %>% mutate_if(is.character,as.factor)
-#   if("value" %in% colnames(df)) {
-#     df$value <- as.numeric(df$value)
-#     col_idx <- grep("value", names(df))
-#     df <- df[, c((1:ncol(df))[-col_idx],col_idx)]
-#   }
-#   
-#   df <- df[!duplicated(df),]
-#   #value needs to be in the end
-#   
-#   return(df)
-# }
-#   
 plot_levels <- function(df) {
   #returns lists of names which are factors or integers
   colnames(df)
@@ -254,8 +160,6 @@ plot_build_suf <- function(G1, df, suffix, chartopt, input) {
   
   G1 = G1 + layer(geom=geom, stat=stat, data=df, mapping=NULL, position=position, params=params, show.legend=show.legend, inherit.aes=inherit.aes, check.aes=check.aes)
   
-  
-  
   return(G1)
 }
 
@@ -268,6 +172,7 @@ plot_build_init <- function(df, input) {
   G1 = G1 + scale_color_manual(values=colorset(df, input)) 
   G1 = G1 + scale_fill_manual(values=colorset(df, input))
   G1 = G1 + scale_shape(solid=FALSE)
+  if(input$ylabpercent){G1 = G1 + scale_y_continuous(labels=scales::percent)}
   
   return(G1)
 }
@@ -284,6 +189,8 @@ plot_build_theme <- function(G1, input) {
   if(input$themeopt=="theme_void"){G1 = G1 + theme_void(base_size=14+input$TextSize)}
   
   G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left")
+  
+  if(input$xlabrotate){G1 = G1 + theme(axis.text.x = element_text(angle=90, hjust=1, vjust =0.5))}
 
   return(G1)
   
@@ -335,9 +242,6 @@ plot_build_wj <- function(df, input){
       }
     }
   }
-  
-  #This adds anything in input$plot_text_add interpreted as parsed formulas
-  eval(parse(text=input$plot_text_add))
 
   return(G1)
 }

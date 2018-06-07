@@ -30,6 +30,13 @@ color_decomp <- c("#FFCC00", "#C0504D", "#9BBB59", "#8064A2", "#4BC0C6", "#F7964
 color_sspland1 <- c('#b2df8a','#33a02c','#6a3d9a','#fdbf6f','#ff7f00','#1f78b4','#e31a1c')
 color_sspland2 <- c('#bebada','#fb8072','#8dd3c7','#80b1d3','#ffffb3')
 
+# Plot presets
+plotpresets <- list(None="",
+                    tornado_decomp="G1 = G1 + geom_point()"
+                    )
+
+plotpresetsdefault <- names(plotpresets)[1]
+
 ### UI code  ============
 # This main bit 'ui' contains all the frontend bits, defining menu items etc.
 # ===
@@ -48,7 +55,9 @@ ui <- function(request) {
          tabPanel("Titles & Legend",
                   textInput("title", "Title:", value = ""),
                   textInput("xlab", "Title x-axis", value = ""),
+                  checkboxInput('xlabrotate', 'Rotate x-axis 90 deg', value = FALSE),
                   textInput("ylab", "Label y-axis", value = ""),
+                  checkboxInput("ylabpercent", "y-label as percentage?", value = FALSE),
                   selectInput("LegendPosition", label = "Select position of the legend", choices=c("left", "top", "right", "bottom"), selected = "right")
          ),
         tabPanel("Size and scales",
@@ -60,16 +69,18 @@ ui <- function(request) {
                  numericInput("ymax", label = "Maximum y", value = 0),
                  checkboxInput('xman', 'Manual x range?'),
                  numericInput("xmin", label = "Minimum x", value = 2010),
-                 numericInput("xmax", label = "Maximum x", value = 2050)
+                 numericInput("xmax", label = "Maximum x", value = 2050),
+                 selectInput(paste("scaling"), label = "Scale by", choices=c("None", "Relative", "Absolute")),
+                 numericInput(paste("scalingyr", suffix, sep=""), label = "Scale relative to year", value = 2010, step = 1))
         ),
         tabPanel("Colors",
                  selectInput("colour_preset", label = "Select color preset", choices=c("None","SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "Decomp"),
-                 colourpicker::colourInput("c1","Pick colour 1", "#00FF00"),
-                 colourpicker::colourInput("c2","Pick colour 2", value=color_ssp[2]),
-                 colourpicker::colourInput("c3","Pick colour 3", value=color_ssp[3]),
-                 colourpicker::colourInput("c4","Pick colour 4", value=color_ssp[4]),
-                 colourpicker::colourInput("c5","Pick colour 5", value=color_ssp[5]),
-                 colourpicker::colourInput("c6","Pick colour 6", value=rainbow(12)[6]),
+                 colourpicker::colourInput("c1","Pick colour 1", value=color_decomp[1]),
+                 colourpicker::colourInput("c2","Pick colour 2", value=color_decomp[2]),
+                 colourpicker::colourInput("c3","Pick colour 3", value=color_decomp[3]),
+                 colourpicker::colourInput("c4","Pick colour 4", value=color_decomp[4]),
+                 colourpicker::colourInput("c5","Pick colour 5", value=color_decomp[5]),
+                 colourpicker::colourInput("c6","Pick colour 6", value=color_decomp[6]),
                  colourpicker::colourInput("c7","Pick colour 7", value=rainbow(12)[7]),
                  colourpicker::colourInput("c8","Pick colour 8", value=rainbow(12)[8]),
                  colourpicker::colourInput("c9","Pick colour 9", value=rainbow(12)[9]),
@@ -79,44 +90,45 @@ ui <- function(request) {
         )
     )),
     mainPanel(
-     
-                 downloadButton("download_png", "Download higher quality PNG"),
-                 # bookmarkButton(label = "Bookmark to shiny_bookmarks folder and restore in browser."),
-                 imageOutput("plot1"),
-                 tabsetPanel(id="settingstabs",
-                   tabPanel('Chart',
-                     column(4, 
-                        uiOutput("flex_options")
-                     ),
-                     column(4,
-                        uiOutput("flex_options2"),
-                        checkboxInput("facet_grid", "Facet grid (2d)", value = FALSE),
-                        numericInput("ncol", label = "Nr. of colums", value = 2, min=1, step=1),
-                        selectInput("scales", label = "Facet scales", choices=c("free_y", "free_x","free", "fixed"), selected = "free")
-                     ),
-                      column(4, 
-                             uiOutput("flex_options3")
-                    )
-                   ),
-                   tabPanel("Data & settings",
-                            p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
-                            
-                            fileInput('file1', 'Choose CSV File to upload (multiple files of same format are possible)',
-                                      accept = c('text/csv', 'text/comma-separated-values,text/plain', '.csv', '.rda'), multiple = TRUE),
-                            selectInput("dataset",label = "Choose Dataset", choices = c(rda_filenames, csv_filenames), selected = "Combined_yield_data.csv"),
-                            selectInput("settings_opt",label = "Choose settings", choices = c("None", ini_filenames), selected = "None"),
-                            actionButton('update_settings', 'Force update settings'),
-                            downloadButton('saveInputs', 'Save settings for re-use later (put in settings folder)')
-                  ),
-                  tabPanel("Table", 
-                           downloadButton('downloadData', 'Download selected data'),
-                           dataTableOutput("mytable")
-                  ),
-                  tabPanel("ggplot code",
-                           p(''),
-                           textAreaInput("plot_text_add", "Add code lines to plot build function:", value="#G1 = G1 + code to add to the plot", width='100%', height ='200px')
-                  ),
-                  selected="Chart"
+         downloadButton("download_png", "Download higher quality PNG"),
+         # bookmarkButton(label = "Bookmark to shiny_bookmarks folder and restore in browser."),
+         imageOutput("plot1"),
+         tabsetPanel(id="settingstabs",
+           tabPanel('Chart',
+             column(4, 
+                uiOutput("flex_options")
+             ),
+             column(4,
+                uiOutput("flex_options2"),
+                checkboxInput("facet_grid", "Facet grid (2d)", value = FALSE),
+                numericInput("ncol", label = "Nr. of colums", value = 2, min=1, step=1),
+                selectInput("scales", label = "Facet scales", choices=c("free_y", "free_x","free", "fixed"), selected = "free")
+             ),
+              column(4, 
+                     uiOutput("flex_options3")
+            )
+           ),
+           tabPanel("Data & settings",
+                    p("AgMIP Data Viewer. Author: Willem-Jan van Zeist, willemjan.vanzeist@pbl.nl."),
+                    
+                    fileInput('file1', 'Choose CSV File to upload (multiple files of same format are possible)',
+                              accept = c('text/csv', 'text/comma-separated-values,text/plain', '.csv', '.rda'), multiple = TRUE),
+                    selectInput("dataset",label = "Choose Dataset", choices = c(rda_filenames, csv_filenames), selected = "Combined_yield_data.csv"),
+                    selectInput("settings_opt",label = "Choose settings", choices = c("None", ini_filenames), selected = "None"),
+                    actionButton('update_settings', 'Force update settings'),
+                    downloadButton('saveInputs', 'Save settings for re-use later (put in settings folder)')
+          ),
+          tabPanel("Table", 
+                   downloadButton('downloadData', 'Download selected data'),
+                   dataTableOutput("mytable")
+          ),
+          tabPanel("ggplot code",
+                   p(''),
+                   selectInput("preset_code",label = "Preset plot", choices = names(plotpresets), selected = plotpresetsdefault),
+                   
+                   textAreaInput("plot_text_add", "Add code lines to plot build function:", value="#G1 = G1 + code to add to the plot", width='600px', height ='200px')
+          ),
+          selected="Chart"
       )
     )
   )) 
@@ -189,25 +201,24 @@ server <- function(input, output, session) {
     
     
     dyn_taglist <- tagAppendChildren(dyn_taglist,
-                                     selectInput("x_var", label = "x_axis:", choices = colnames(agmip_csv()),selected = "Year"),
-                                     selectInput("y_var", label = "y_axis:", choices = colnames(agmip_csv()), selected = if(!("value" %in% colnames(agmip_csv()))){tail(colnames(agmip_csv()),1)}else{c("value")}),
-                                     selectInput("Facet", label = "Facet by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
-                                     selectInput("Facet2", label = "Facets nr2 by:", choices = c(colnames(agmip_csv()), "None"),selected = "None")
+                       selectInput("x_var", label = "x_axis:", choices = colnames(agmip_csv()),selected = "Year"),
+                       selectInput("y_var", label = "y_axis:", choices = colnames(agmip_csv()), selected = if(!("value" %in% colnames(agmip_csv()))){tail(colnames(agmip_csv()),1)}else{c("value")}),
+                       selectInput("Facet", label = "Facet by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
+                       selectInput("Facet2", label = "Facets nr2 by:", choices = c(colnames(agmip_csv()), "None"),selected = "None")
     )
        
-    
     dyn_taglist
   })
   
   output$flex_options3 <- renderUI({
     
     dyn_taglist <- tagList()
-    col_options = c(colnames(agmip_csv()),"None")
+    col_options = c("None", colnames(agmip_csv()))
     def_cols = col_options[col_options != "Year" & col_options != "value"]
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('color', 'Color', choices = col_options, selected=def_cols[1]))
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('linetype', 'Linetype', choices = col_options, selected=def_cols[2]))
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('shape', 'Shape (for points)', choices = col_options, selected=def_cols[3]))
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('fill', 'Fill (for bar, ribbon, etc)', choices = col_options, selected=def_cols[4]))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('color', 'Color', choices = col_options, selected=def_cols[2]))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('linetype', 'Linetype', choices = col_options, selected=def_cols[3]))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('shape', 'Shape (for points)', choices = col_options, selected=def_cols[4]))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput('fill', 'Fill (for bar, etc)', choices = col_options, selected=def_cols[5]))
     
     dyn_taglist
   })
@@ -218,8 +229,6 @@ server <- function(input, output, session) {
     
     sel = if(suffix==1){"Line"}else{"None"} # setting default
     dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("chart", suffix, sep=""), label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","geom_vline","geom_hline","linesummary","average_line","geom_smooth", "None"), selected = sel))
-        
-    
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste('size',suffix,sep=""), 'Size/thickness', value=1.5, step=0.25))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("dodgewidth", suffix, sep=""), label = "Unstack width bars", value = 0, step=0.1))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste('alpha',suffix,sep=""), 'Alpha', min=0, max=1, value=1, step=0.05))
@@ -321,6 +330,12 @@ server <- function(input, output, session) {
     #G1 <- plot_build_wj(plot_data(), reactiveValuesToList(input))
     df <- plot_data()
     G1 <- plot_build_wj(df, input)
+    
+    #This adds anything in input$plot_text_add interpreted as parsed formulas
+    
+    eval(parse(text=plotpresets[[input$preset_code]]))
+    eval(parse(text=input$plot_text_add))
+    
     plot(G1)
     #save(df, file="shinyplotdata.rda")
 
@@ -355,8 +370,10 @@ server <- function(input, output, session) {
     },
 
     content = function(file) {
-      shiny_plot <- plot_build_wj(plot_data(), reactiveValuesToList(input))
-      ggsave(file, shiny_plot, width=input$ChartWidth/72, height=input$ChartHeight/72, device="png")
+      G1 <- plot_build_wj(plot_data(), reactiveValuesToList(input))
+      eval(parse(text=plotpresets[[input$preset_code]]))
+      eval(parse(text=input$plot_text_add))
+      ggsave(file, G1, width=input$ChartWidth/72, height=input$ChartHeight/72, device="png")
       
       #file.copy("../output_plots/plot.png", file)
     },
