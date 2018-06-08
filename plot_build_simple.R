@@ -19,21 +19,17 @@ library(shiny)
 
 source('./WJlib.R')
 
-plot_data_wj <- function(df,input){
-  
+plot_data_wj <- function(df,input,scaling="None", yr=2010){
   
   colcount <- ncol(df) - 2
   cln <- colcount + 1
-  plot_levels <- plot_levels(df)
+  plot_levels <- colnames(df)
   
   for (i in 1:length(plot_levels)) {
-    # subsets for all plot levels used for input control. 
     # Double brackets for input needed because it is a reactivevalues cladf
-    
-    #if(input$pngloop!=plot_levels[i]){
-    if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
-    #}
+    # Doing year after scaling
     if(!(plot_levels[i] == "Year")) { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
       if(!("All" %in% input[[plot_levels[i]]])){df[,plot_levels[i]] <- factor(df[,plot_levels[i]], levels=input[[plot_levels[i]]])}
     }   
   }
@@ -41,13 +37,43 @@ plot_data_wj <- function(df,input){
   df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
   df$Year = as.integer(as.character(df$Year))
   
+  if(scaling == "Absolute"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
+      df$index <- NULL
+      cln = cln - 1
+      colcount = colcount - 1
+    }
+    df <- spread(df, Year, value)
+  
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)]
+
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  if(scaling == "Relative"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
+      df$index <- NULL
+      cln = cln - 1
+      colcount = colcount - 1
+    }
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df[,as.character(yr)]
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$value <- df$value
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  
+  for (i in 1:length(plot_levels)) {
+    # Double brackets for input needed because it is a reactivevalues cladf
+    # Doing year after scaling
+    if(plot_levels[i] == "Year") { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
+    }   
+  }
   
   return(df)
-}
-
-plot_levels <- function(df) {
-  #returns lists of names which are factors or integers
-  colnames(df)
 }
 
 
@@ -77,8 +103,8 @@ stringconvert <- function(convstr,df,input) {
     convstr = ""
     for (i in 1:length(text_list)){
       # Should add that this works for all subsets just in case
-      if (text_list[i] %in% colnames(plot_subset(df,1,input))){
-        uname = unique(plot_subset(df,1,input)[,text_list[i]])
+      if (text_list[i] %in% colnames(df)){
+        uname = unique(df[,text_list[i]])
         convstr = paste(convstr, uname, sep ="", collapse = ', ')  
       } else {
         convstr = paste(convstr, text_list[i], sep ="")
@@ -86,164 +112,67 @@ stringconvert <- function(convstr,df,input) {
     }
   } 
   
-  str2 <- unlist(strsplit(convstr, "CO2"))
-  #N20 toevoetgen.
-  if(!(convstr=="" | identical(str2, character(0)))){
-    if(str2!=convstr){
-      convstr = bquote(.(str2[1])*CO[2]*.(if(length(str2)>1){str2[2]}))
-    } 
-  }
-  
   return(convstr)
 }
 
-plot_build_suf <- function(G1, df, suffix, chartopt, input) {
-  
-  color = input[["color"]]
-  fill = input[["fill"]]
-  linetype = input[["linetype"]]
-  shape = input[["shape"]]
-  alpha = input[[paste("alpha", suffix, sep="")]]
-  size = input[[paste("size", suffix, sep="")]]
-  width = input[[paste("size", suffix, sep="")]]
-  dodgewidth=input[[paste("dodgewidth", suffix, sep="")]]
-  
-  params <- list()
-  if (chartopt!="geom_vline"){
-    G1 = G1 + aes_string(x=input$x_var, y=input$y_var)
-    if(linetype!="None"){G1 = G1 + aes_string(linetype=linetype)}
-    if(color!="None"){G1 = G1 + aes_string(color=color)}
-    if(shape!="None"){G1 = G1 + aes_string(shape=shape)}
-    if(fill!="None"){G1 = G1 + aes_string(fill=fill)}
-    params <- list(size=size, alpha=alpha)
-  }
-  
-  
-  stat = "identity"
-  position = "identity"
-  show.legend=NA
-  inherit.aes=TRUE
-  check.aes=TRUE
-  
-  if(chartopt=="Line"){
-    geom="line"
-  } else if(chartopt=="Point"){
-    geom="point"
-  } else if (chartopt=="Bar" | chartopt=="Stacked bar"){
-    geom='bar'
-    params$width = width
-    if(dodgewidth==0){position="stack"}else{position=position_dodge(dodgewidth)}
-  } else if(chartopt=="Area") {
-    geom="area"
-  } else if(chartopt=="geom_smooth") {
-    geom="line"
-    stat="smooth"
-  } else if(chartopt=="Ribbon") {
-    stat="summary"
-    geom="ribbon"
-    params$fun.ymin="min"
-    params$fun.ymax="max"
-    params$colour=NA
-  } else if(chartopt=="average_line") {
-    geom="line"
-    params$fun.y="mean"
-    stat="summary"
-  } else if(chartopt=="Boxplot") {
-    geom="boxplot"
-    params$outlier.shape=46
-  } else if(chartopt=="linesummary") {
-    geom="linerange"
-    params$fun.yxmax = "max"
-    params$fun.ymin = "min"
-    show.legend = FALSE
-  }
-  
-  G1 = G1 + layer(geom=geom, stat=stat, data=df, mapping=NULL, position=position, params=params, show.legend=show.legend, inherit.aes=inherit.aes, check.aes=check.aes)
-  
-  return(G1)
-}
-
-
-plot_build_init <- function(df, input) {
-  # Labels and stuff
-  #functext = "G1 = ggplot(data=df)"
-  G1 = ggplot(data=df)
-  
-  G1 = G1 + scale_color_manual(values=colorset(df, input)) 
-  G1 = G1 + scale_fill_manual(values=colorset(df, input))
-  G1 = G1 + scale_shape(solid=FALSE)
-  if(input$ylabpercent){G1 = G1 + scale_y_continuous(labels=scales::percent)}
-  
-  return(G1)
-}
-
-plot_build_theme <- function(G1, input) {
-
-  if(input$themeopt=="theme_bw"){G1 = G1 + theme_bw(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_classic"){G1 = G1 + theme_classic(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_dark"){G1 = G1 + theme_dark(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_gray"){G1 = G1 + theme_gray(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_light"){G1 = G1 + theme_light(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_linedraw"){G1 = G1 + theme_linedraw(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_minimal"){G1 = G1 + theme_minimal(base_size=14+input$TextSize)}
-  if(input$themeopt=="theme_void"){G1 = G1 + theme_void(base_size=14+input$TextSize)}
-  
-  G1 = G1 + theme(legend.position=input$LegendPosition, legend.box="vertical",legend.box.just="left")
-  
-  if(input$xlabrotate){G1 = G1 + theme(axis.text.x = element_text(angle=90, hjust=1, vjust =0.5))}
-
-  return(G1)
-  
-}  
-  
 plot_build_wj <- function(df, input){
   
   if(nrow(df)==0){return(NULL)}
-  
-  #if(input$factor_xvar){df[,input$x_var] <-factor(df[,input$x_var])}
-  
-  
-  #if(input$factor_xvar){df[,input$x_var] <-factor(df[,input$x_var])}
-  
-  
-  G1 = plot_build_init(df,input)
-  i = 1
-  chartopt = input[[paste("chart", i, sep="")]]
+  chartopt = input$chart
   if(chartopt == "Bar") {df[,input$x_var] <-factor(df[,input$x_var])}
+
+  colset = deparse(colorset(df, input), width.cutoff = 500)
+
+  G1_text = "G1 = ggplot(data=df)\n"
   
-  if(!is.null(chartopt)) {
-    if(chartopt!="None") {
-      G1 = G1 %>% plot_build_suf(df, i, chartopt, input)
-    }
+  G1_text = paste(G1_text, "G1 = G1 + aes(x=",input$x_var,", y=",input$y_var,")\n", sep="")
+  if(input$ylabpercent){G1_text = paste(G1_text, "G1 = G1 + scale_y_continuous(labels=scales::percent)\n", sep="")}
+  
+  scalecolor = paste("G1 = G1 + scale_color_manual(values=",colset,")\n", sep="")
+  scalefill = paste("G1 = G1 + scale_fill_manual(values=",colset,")\n", sep="")
+  scaleshape = paste("G1 = G1 + scale_shape(solid=FALSE)\n", sep="")
+  
+  aesline = if(input$linetype!="None"){paste("G1 = G1 + aes(linetype=",input$linetype,")\n", sep="")}else{""}
+  aesfill = if(input$fill!="None"){paste("G1 = G1 + aes(fill=",input$fill,")\n", sep="")}else{""}
+  aesshape = if(input$shape!="None"){paste("G1 = G1 + aes(shape=",input$shape,")\n", sep="")}else{""}
+  aescolor = if(input$color!="None"){paste("G1 = G1 + aes(color=",input$color,")\n", sep="")}else{""}
+  plttext <- switch(chartopt,
+         Line = paste(aesline,aescolor,scalecolor, 
+                      "G1 = G1 + geom_line(size=",input$size,", alpha=",input$alpha,")\n", sep=""),
+         Point = paste(aesshape,scaleshape, aescolor, 
+                       "G1 = G1 + geom_point(size=",input$size,", alpha=",input$alpha,")\n", sep=""),
+         Bar = paste(aesfill,scalefill, aescolor, scalecolor,
+                       "G1 = G1 + geom_bar(stat='identity',size=",input$size,", alpha=",input$alpha,", width=",input$size,",",
+                       "position=", if(input$dodgewidth==0){"'stack'"}else{paste("position_dodge(",input$dodgewidth,")", sep="")},")\n", sep="")
+          )
+  G1_text = paste(G1_text,plttext, sep="")
+  
+  G1_text = paste(G1_text, "G1 = G1 + ", input$themeopt,"(base_size=14+", input$TextSize,")\n", sep="")
+  G1_text = paste(G1_text, "G1 = G1 + theme(legend.position='",input$LegendPosition,"',legend.box='vertical',legend.box.just='left')\n", sep="")  
+  if(input$xlabrotate){
+    G1_text = paste(G1_text, "G1 = G1 + theme(axis.text.x = element_text(angle=90, hjust=1, vjust =0.5))\n")
   }
   
-  G1 =  G1 %>% plot_build_theme(input)
+  if(input$title!=""){G1_text <- paste(G1_text, "G1 = G1 + ggtitle('",stringconvert(convstr = input$title, df, input) ,"')\n", sep="")} 
+  if(input$xlab!=""){G1_text <- paste(G1_text, "G1 = G1 + xlab('",stringconvert(convstr = input$xlab, df, input) ,"')\n", sep="")} 
+  if(input$ylab!=""){G1_text <- paste(G1_text, "G1 = G1 + ylab('",stringconvert(convstr = input$ylab, df, input) ,"')\n", sep="")} 
+  if(input$xman){G1_text <- paste(G1_text, "G1 = G1 + xlim(", input$xmin, ",",input$xmax,")\n", sep="")}
+  if(input$yman){G1_text <- paste(G1_text, "G1 = G1 + ylim(", input$ymin, ",",if(input$ymin<input$ymax){input$ymax}else{NA},")\n", sep="")}
   
-  if(input$title!=""){G1 = G1 + ggtitle(stringconvert(convstr = input$title, df, input))} 
-  if(input$xlab!=""){G1 = G1 + xlab(stringconvert(convstr = input$xlab, df, input))} 
-  if(input$ylab!=""){G1 = G1 + ylab(stringconvert(convstr = input$ylab, df, input))} 
-  
-  if (input$xman){G1 <- G1 + xlim(input$xmin, input$xmax)}  
-  if (input$yman){G1 <- G1 + ylim(input$ymin, if(input$ymin<input$ymax){input$ymax}else{NA})}
-  
-  if (!is.null(input$Facet)) {
-    if (input$Facet!="None" & input$Facet2=="None"){
-      G1 <- G1 + facet_wrap(as.formula(paste("~", input$Facet)),
-                            ncol=input$ncol, 
-                            scales = input$scales)
-    } else if (input$Facet!="None" & input$Facet2!="None"){
+  if (!is.null(input$facet)) {
+    if(input$facet!="None"){
+      coltxt = paste("ncol=", input$ncol, sep="")
+      scltxt = paste("scales='", input$scales, "'",sep="")
+      frmtxt = paste("'",if(input$facet2=="None"){""}else{input$facet2}," ~ ",input$facet,"'", sep="")  
       if (input$facet_grid) {
-        G1 <- G1 + facet_grid(as.formula(paste(input$Facet2, "~", input$Facet)),
-                              scales = input$scales)
+        G1_text <- paste(G1_text, "G1 = G1 + facet_grid(as.formula(",frmtxt,"),",scltxt,")\n", sep="") 
       }else{
-        G1 <- G1 + facet_wrap(as.formula(paste(input$Facet2, "~", input$Facet)),
-                              ncol=input$ncol,
-                              scales = input$scales)
+        G1_text <- paste(G1_text, "G1 = G1 + facet_wrap(as.formula(",frmtxt,"),",coltxt,",",scltxt,")\n", sep="")
       }
     }
   }
-
-  return(G1)
+  
+  return(G1_text)
 }
   
   
