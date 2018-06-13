@@ -48,6 +48,63 @@ scenario_range <- function(df, yr) {
   return(yr_data)
 }
 
+plot_data_wj <- function(df,input,scaling="None", yr=2010){
+  
+  colcount <- ncol(df) - 2
+  cln <- colcount + 1
+  plot_levels <- colnames(df)
+  
+  for (i in 1:length(plot_levels)) {
+    # Double brackets for input needed because it is a reactivevalues cladf
+    # Doing year after scaling
+    if(!(plot_levels[i] == "Year")) { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
+      if(!("All" %in% input[[plot_levels[i]]])){df[,plot_levels[i]] <- factor(df[,plot_levels[i]], levels=input[[plot_levels[i]]])}
+    }   
+  }
+  
+  df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
+  df$Year = as.integer(as.character(df$Year))
+  
+  if(scaling == "Absolute"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
+      df$index <- NULL
+      cln = cln - 1
+      colcount = colcount - 1
+    }
+    df <- spread(df, Year, value)
+    
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)]
+    
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  if(scaling == "Relative"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
+      df$index <- NULL
+      cln = cln - 1
+      colcount = colcount - 1
+    }
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df[,as.character(yr)]
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$value <- df$value
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  
+  for (i in 1:length(plot_levels)) {
+    # Double brackets for input needed because it is a reactivevalues cladf
+    # Doing year after scaling
+    if(plot_levels[i] == "Year") { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
+    }   
+  }
+  
+  return(df)
+}
+
 my_dataread <- function(file_list, name_list = FALSE) {
   
   filecount = length(file_list)

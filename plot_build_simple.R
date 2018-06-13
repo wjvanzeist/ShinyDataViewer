@@ -19,62 +19,6 @@ library(shiny)
 
 source('./WJlib.R')
 
-plot_data_wj <- function(df,input,scaling="None", yr=2010){
-  
-  colcount <- ncol(df) - 2
-  cln <- colcount + 1
-  plot_levels <- colnames(df)
-  
-  for (i in 1:length(plot_levels)) {
-    # Double brackets for input needed because it is a reactivevalues cladf
-    # Doing year after scaling
-    if(!(plot_levels[i] == "Year")) { # 
-      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
-      if(!("All" %in% input[[plot_levels[i]]])){df[,plot_levels[i]] <- factor(df[,plot_levels[i]], levels=input[[plot_levels[i]]])}
-    }   
-  }
-  
-  df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
-  df$Year = as.integer(as.character(df$Year))
-  
-  if(scaling == "Absolute"){
-    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
-      df$index <- NULL
-      cln = cln - 1
-      colcount = colcount - 1
-    }
-    df <- spread(df, Year, value)
-  
-    df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)]
-
-    df <- melt(df, id.vars=1:colcount, variable_name="Year")
-    df <- na.omit(df)
-    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
-  }
-  if(scaling == "Relative"){
-    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
-      df$index <- NULL
-      cln = cln - 1
-      colcount = colcount - 1
-    }
-    df <- spread(df, Year, value)
-    df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df[,as.character(yr)]
-    df <- melt(df, id.vars=1:colcount, variable_name="Year")
-    df <- na.omit(df)
-    df$value <- df$value
-    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
-  }
-  
-  for (i in 1:length(plot_levels)) {
-    # Double brackets for input needed because it is a reactivevalues cladf
-    # Doing year after scaling
-    if(plot_levels[i] == "Year") { # 
-      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
-    }   
-  }
-  
-  return(df)
-}
 
 
 colorset <- function(df,input) {
@@ -137,14 +81,26 @@ plot_build_wj <- function(df, input){
   aesshape = if(input$shape!="None"){paste("G1 = G1 + aes(shape=",input$shape,")\n", sep="")}else{""}
   aescolor = if(input$color!="None"){paste("G1 = G1 + aes(color=",input$color,")\n", sep="")}else{""}
   plttext <- switch(chartopt,
+          # "Line","Point","Bar","Ribbon","Area","Boxplot","linesummary","geom_smooth", "None"
          Line = paste(aesline,aescolor,scalecolor, 
                       "G1 = G1 + geom_line(size=",input$size,", alpha=",input$alpha,")\n", sep=""),
          Point = paste(aesshape,scaleshape, aescolor, 
                        "G1 = G1 + geom_point(size=",input$size,", alpha=",input$alpha,")\n", sep=""),
          Bar = paste(aesfill,scalefill, aescolor, scalecolor,
                        "G1 = G1 + geom_bar(stat='identity',size=",input$size,", alpha=",input$alpha,", width=",input$size,",",
-                       "position=", if(input$dodgewidth==0){"'stack'"}else{paste("position_dodge(",input$dodgewidth,")", sep="")},")\n", sep="")
-          )
+                       "position=", if(input$dodgewidth==0){"'stack'"}else{paste("position_dodge(",input$dodgewidth,")", sep="")},")\n", sep=""),
+         Area = paste(aesfill,scalefill, aescolor, scalecolor, aesline,
+                       "G1 = G1 + geom_area(alpha=",input$alpha,")\n", sep=""),
+         Ribbon = paste(aesfill,scalefill,
+                      "G1 = G1 + geom_ribbon(stat='summary',fun.ymin=min,fun.ymax=max,colour=NA,alpha=",input$alpha,")\n", sep=""),
+         Boxplot = paste(aescolor,scalecolor, aesshape, scaleshape,
+                        "G1 = G1 + geom_boxplot(outlier.shape=46)\n",
+                        "G1 = G1 + geom_point(size=", input$size,")\n",sep=""),
+         linesummary = paste(aesfill,scalefill,aescolor, scalecolor,
+                        "G1 = G1 + geom_linerange(stat='summary',fun.ymin=min,fun.ymax=max,alpha=",input$alpha,",size=",input$size,")\n", sep=""),
+         geom_smooth = paste(aesline,aescolor,scalecolor, 
+                      "G1 = G1 + geom_smooth(size=",input$size,", alpha=",input$alpha,")\n", sep=""),
+         )
   G1_text = paste(G1_text,plttext, sep="")
   
   G1_text = paste(G1_text, "G1 = G1 + ", input$themeopt,"(base_size=14+", input$TextSize,")\n", sep="")

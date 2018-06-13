@@ -18,6 +18,8 @@ library(shiny)
 
 source('./plot_build_simple.R')
 source('./WJlib.R')
+source('./pbl_colors.R')
+allcols = c(hemelblauw3010,hemelblauw3011,hemelblauw3012,hemelblauw3013,hemelblauw3014,hemelblauw3015,hemelblauw3016,hemelblauw3017,hemelblauw3018,hemelblauw3019,mosgroen3020,mosgroen3021,mosgroen3022,mosgroen3023,mosgroen3024,mosgroen3025,mosgroen3026,mosgroen3027,mosgroen3028,mosgroen3029,violet3030,violet3031,violet3032,violet3033,violet3034,violet3035,violet3036,violet3037,violet3038,violet3039,donkergeel3040,donkergeel3041,donkergeel3042,donkergeel3043,donkergeel3044,donkergeel3045,donkergeel3046,donkergeel3047,donkergeel3048,donkergeel3049,paars3050,paars3051,paars3052,paars3053,paars3054,paars3055,paars3056,paars3057,paars3058,paars3059,lichtblauw3060,lichtblauw3061,lichtblauw3062,lichtblauw3063,lichtblauw3064,lichtblauw3065,lichtblauw3066,lichtblauw3067,lichtblauw3068,lichtblauw3069,roze3070,roze3071,roze3072,roze3073,roze3074,roze3075,roze3076,roze3077,roze3078,roze3079,groen3080,groen3081,groen3082,groen3083,groen3084,groen3085,groen3086,groen3087,groen3088,groen3089,rood3090,rood3091,rood3092,rood3093,rood3094,rood3095,rood3096,rood3097,rood3098,rood3099,donkergroen3100,donkergroen3101,donkergroen3102,donkergroen3103,donkergroen3104,donkergroen3105,donkergroen3106,donkergroen3107,donkergroen3108,donkergroen3109,oranje3110,oranje3111,oranje3112,oranje3113,oranje3114,oranje3115,oranje3116,oranje3117,oranje3118,oranje3119,donkerbruin3120,donkerbruin3121,donkerbruin3122,donkerbruin3123,donkerbruin3124,donkerbruin3125,donkerbruin3126,donkerbruin3127,donkerbruin3128,donkerbruin3129,robijnrood3130,robijnrood3131,robijnrood3132,robijnrood3133,robijnrood3134,robijnrood3135,robijnrood3136,robijnrood3137,robijnrood3138,robijnrood3139,bruin3140,bruin3141,bruin3142,bruin3143,bruin3144,bruin3145,bruin3146,bruin3147,bruin3148,bruin3149,mintgroen3150,mintgroen3151,mintgroen3152,mintgroen3153,mintgroen3154,mintgroen3155,mintgroen3156,mintgroen3157,mintgroen3158,mintgroen3159,geel3160,geel3161,geel3162,geel3163,geel3164,geel3165,geel3166,geel3167,geel3168,geel3169,donkerblauw3170,donkerblauw3171,donkerblauw3172,donkerblauw3173,donkerblauw3174,donkerblauw3175,donkerblauw3176,donkerblauw3177,donkerblauw3178,donkerblauw3179,roodgeelgroen3200,roodgeelgroen3201,roodgeelgroen3202,roodgeelgroen3203,roodgeelgroen3204,roodgeelgroen3205,roodgeelgroen3206,roodgeelgroen3207,roodgeelgroen3208,roodgeelgroen3209,roodhemelblauw3300,roodhemelblauw3301,roodhemelblauw3302,roodhemelblauw3303,roodhemelblauw3304,roodhemelblauw3305,roodhemelblauw3306,roodhemelblauw3307,roodhemelblauw3308,roodhemelblauw3309,zwart3400,zwart3401,zwart3402,zwart3403,zwart3404,zwart3405,zwart3406,zwart3407,zwart3408,zwart3409,wit,hemelblauwdonker3610,hemelblauwdonker3611,mosgroendonker3620,mosgroendonker3621,violetdonker3630,violetdonker3631,geeldonker3640,geeldonker3641,groendonker3680,groendonker3681,rooddonker3690,rooddonker3691)
 
 # Initialzing global vars ---------------------------------------------
 if(dir.exists("../data_files")){datapath="../data_files"}else{datapath="./"}
@@ -86,7 +88,8 @@ ui <- function(request) {
                  colourpicker::colourInput("c9","Pick colour 9", value=rainbow(12)[9]),
                  colourpicker::colourInput("c10","Pick colour 10", value=rainbow(12)[10]),
                  colourpicker::colourInput("c11","Pick colour 11", value=rainbow(12)[11]),
-                 colourpicker::colourInput("c12","Pick colour 12", value=rainbow(12)[12])
+                 colourpicker::colourInput("c12","Pick colour 12", value=rainbow(12)[12]),
+                 colourpicker::colourInput("c13","Pick colour 13", palette = 'limited', allowedCols = allcols)
         )
     )),
     mainPanel(
@@ -224,7 +227,7 @@ server <- function(input, output, session) {
   output$flex_options_chart <- renderUI({
     dyn_taglist <- tagList()
     
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput("chart", label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","linesummary","average_line","geom_smooth", "None"), selected = "Line"))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput("chart", label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","linesummary","geom_smooth", "None"), selected = "Line"))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput('size', label = 'Size/thickness', value=1.5, step=0.25))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput("dodgewidth", label = "Unstack width bars", value = 0, step=0.1))
     dyn_taglist <- tagAppendChild(dyn_taglist, numericInput('alpha', 'Alpha', min=0, max=1, value=1, step=0.05))
@@ -360,7 +363,7 @@ server <- function(input, output, session) {
       plotname <- paste(stringconvert(input$title, ss, input), ".png", sep="")
     }
     
-    codetext <- paste(codetext, "ggsave('",plotname,"', G1, width=",input$ChartWidth/72,", height=",input$ChartHeight/72,", device='png')\n")
+    codetext <- paste(codetext, "ggsave('",plotname,"', G1, width=",input$ChartWidth/72,", height=",input$ChartHeight/72,", device='png')\n", sep="")
     
     return(codetext)
   })
