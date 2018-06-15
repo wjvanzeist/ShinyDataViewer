@@ -88,6 +88,79 @@ my_dataread <- function(file_list, name_list = FALSE) {
   return(DATA)
 }
 
+plot_data_wj <- function(df,input,scaling="None", yr=2010, scalingby="", Facet="None"){
+  
+  colcount <- ncol(df) - 2
+  cln <- colcount + 1
+  plot_levels <- colnames(df)
+  
+  for (i in 1:length(plot_levels)) {
+    # Double brackets for input needed because it is a reactivevalues class
+    # Doing year after scaling
+    if(!(plot_levels[i] == "Year")) { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
+      if(!("All" %in% input[[plot_levels[i]]])){df[,plot_levels[i]] <- factor(df[,plot_levels[i]], levels=input[[plot_levels[i]]])}
+    }   
+  }
+  
+  df <- droplevels(df) # necedfary because empty levels might be left over after subsetting.
+  df$Year = as.integer(as.character(df$Year))
+  
+  if (scalingby != "" & scaling == "Absolute") {
+    rowvar <- unlist(strsplit(scalingby, ";"))[2]
+    col <- unlist(strsplit(scalingby, ";"))[1]
+    scale <- df[df[,col]==rowvar & df$Year == yr,]
+    scale = scale$value # will be multiple values in case of facets (or wrong input)
+  }
+  
+  if(scaling == "Absolute"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
+      df$index <- NULL
+      cln = cln - 1
+      colcount = colcount - 1
+    }
+    df <- spread(df, Year, value)
+    if(scalingby != "" & Facet != "None") {
+      rows <- unique(df[,Facet])
+      for (i in 1:length(rows)) {
+        dfsub = subset(df, df[,Facet]==rows[i])
+        scale <- dfsub[dfsub[,col]==rowvar,]
+        scale = scale[,as.character(yr)]
+        dfsub[,cln:ncol(dfsub)] <- dfsub[,cln:ncol(dfsub)] - dfsub[,as.character(yr)] + scale
+        df <- rbind(dfsub, subset(df, df[,Facet]!=rows[i]))
+      }
+    } else {
+      df[,cln:ncol(df)] <- df[,cln:ncol(df)] - df[,as.character(yr)] + scale
+    }
+    
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  if(scaling == "Relative"){
+    if ("index" %in% colnames(df) & "value" %in% colnames(df)){
+      df$index <- NULL
+      cln = cln - 1
+      colcount = colcount - 1
+    }
+    df <- spread(df, Year, value)
+    df[,cln:ncol(df)] <- df[,cln:ncol(df)]/df[,as.character(yr)]
+    df <- melt(df, id.vars=1:colcount, variable_name="Year")
+    df <- na.omit(df)
+    df$Year <- as.numeric(substr(df$Year, 1, stop=100))
+  }
+  
+  for (i in 1:length(plot_levels)) {
+    # Double brackets for input needed because it is a reactivevalues cladf
+    # Doing year after scaling
+    if(plot_levels[i] == "Year") { # 
+      if(!("All" %in% input[[plot_levels[i]]])){df <- subset(df, df[,plot_levels[i]] %in% input[[plot_levels[i]]])}
+    }   
+  }
+  
+  return(df)
+}
+
 data_cleaner <- function(df){
   
   #Multiple claenup of names/headers units, etc.
@@ -146,15 +219,16 @@ data_cleaner <- function(df){
   }
   
   #some general renaming
-  if("Region" %in% colnames(df)){
-    df$Region = gsub("R5.2", "", df$Region)
-    df$Region = gsub("Global", "WLD", df$Region)
-    df$Region = gsub("^World$", "WLD", df$Region)
-    df$Region = gsub("Total", "WLD", df$Region)
-  }
+  # if("Region" %in% colnames(df)){
+  #   df$Region = gsub("R5.2", "", df$Region)
+  #   df$Region = gsub("Global", "WLD", df$Region)
+  #   df$Region = gsub("^World$", "WLD", df$Region)
+  #   df$Region = gsub("Total", "WLD", df$Region)
+  # }
   if("Unit" %in% colnames(df)){
     df$Unit = gsub("Mt CO2e", "MtCO2e",df$Unit)
     df$Unit = gsub("kcal/cap/day", "kcal/cap/d",df$Unit)
+    df$Unit = gsub("1000 Ha", "1000 ha",df$Unit)
   }
   if("Item" %in% colnames(df)){
     df$Item = gsub("wheat", "Wheat", df$Item)
@@ -402,7 +476,7 @@ Hard fibres, ,PFB
 }
 
 
-mapping_regions <- function(df, to, from) {
+mapping_regions <- function(df, to, from, jd = TRUE) {
   
   map_table <- "
 ISO code,Country name,IMAGE region Index-26,IMAGE region-26,IMAGE region-24,IMAGE region Code-26,MAGNET region Index-26,MAGNET region-26,GDAM L-0 Country Index,SSP Database Region,AgMIP-13,AgMIP-4,FSMIP Region-7,FSMIP Region Code-7,Comment
@@ -679,9 +753,14 @@ YUG,Yugoslavia,12,Eastern Europe,Eastern Europe,CEU,14,REaEurope,NA,OECD,EUR,
   df_map$Region <- map_table$AgMIP.13[match(df_map$Region, region_map$Other)]
   df <- rbind(df_map, df)
   
+  if (jd) {
+    df_map <- subset(df, Region %in% region_map$AgMIP.13)
+    df <- subset(df, !(Region %in% region_map$AgMIP.13))
+    df_map$Region <- map_table$Doelman2018[match(df_map$Region, region_map$AgMIP.13)]
+    df <- rbind(df_map, df)
+  }
   
-  
-  # for (i in 1:dim(map_table)[1]) {
+   # for (i in 1:dim(map_table)[1]) {
   #   print(i)
   #   df$Region <- gsub(toString(map_table[i,from]), toString(map_table[i,to]), df$Region)
   # }
