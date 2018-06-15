@@ -13,6 +13,8 @@ library(knitr)
 library(ggplot2)
 library(grid)
 
+source('~/disks/y/ontwapps/IMAGE/users/zeistvw/Shiny Apps & graphs/ShinyDataViewer/mym2r.R')
+
 find_col_year <- function(df, yr) {
   # Finds 
   clnr=c(0,0)
@@ -102,6 +104,8 @@ plot_data_wj <- function(df,input,scaling="None", yr=2010){
     }   
   }
   
+  print(summary(df))
+  
   return(df)
 }
 
@@ -115,6 +119,8 @@ my_dataread <- function(file_list, name_list = FALSE) {
 
     if (file_ext(file_list[i])[1] == "rda") { 
       DATAtmp <- readRDS(f)
+    } else if ((file_ext(file_list[i])[1] == "out")){
+      DATAtmp <- read.mym2r(f)
     } else {
       DATAtmp <- read.csv(f, sep=",", dec=".")
       if(ncol(DATAtmp)==1) {
@@ -317,6 +323,7 @@ data_cleaner <- function(df){
   
   #This makes sure that all non-numeric columns are factorized.
   df <- df %>% mutate_if(is.character,as.factor)
+  
   if("value" %in% colnames(df)) {
     df$value <- as.numeric(df$value)
     col_idx <- grep("value", names(df))
@@ -406,9 +413,7 @@ YIRF_POT,ARRF"
       ss[,mapvar] <- ss[,mapvar] / ss[,pervar]
       
       ss[,pervar] <- NULL
-      #print(summary(DATA))
-      #print(mapvar)
-      # print(length(colnames(ss))-2)
+
       ss <- melt(ss, id=1:ncol, variable_name = "Variable")  
       
       df_ex <- subset(df_ex, Variable != mapvar)

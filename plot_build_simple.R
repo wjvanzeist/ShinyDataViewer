@@ -64,8 +64,15 @@ plot_build_wj <- function(df, input){
   if(nrow(df)==0){return(NULL)}
   chartopt = input$chart
   if(chartopt == "Bar") {df[,input$x_var] <-factor(df[,input$x_var])}
-
-  colset = deparse(colorset(df, input), width.cutoff = 500)
+  # if(input$linetype!="None"){df[,input$linetype] <-factor(df[,input$linetype])}
+  # if(input$fill!="None"){df[,input$fill] <-factor(df[,input$fill])}
+  # if(input$shape!="None"){df[,input$shape] <-factor(df[,input$shape])}
+  # if(input$color!="None"){df[,input$color] <-factor(df[,input$color])}
+  # 
+  print(summary(df))
+  print(levels(df))
+  
+  colset = paste(deparse(colorset(df, input)), sep="", collapse="")
 
   G1_text = "G1 = ggplot(data=df)\n"
   
@@ -76,10 +83,10 @@ plot_build_wj <- function(df, input){
   scalefill = paste("G1 = G1 + scale_fill_manual(values=",colset,")\n", sep="")
   scaleshape = paste("G1 = G1 + scale_shape(solid=FALSE)\n", sep="")
   
-  aesline = if(input$linetype!="None"){paste("G1 = G1 + aes(linetype=",input$linetype,")\n", sep="")}else{""}
-  aesfill = if(input$fill!="None"){paste("G1 = G1 + aes(fill=",input$fill,")\n", sep="")}else{""}
-  aesshape = if(input$shape!="None"){paste("G1 = G1 + aes(shape=",input$shape,")\n", sep="")}else{""}
-  aescolor = if(input$color!="None"){paste("G1 = G1 + aes(color=",input$color,")\n", sep="")}else{""}
+  aesline = if(input$linetype!="None"){paste("G1 = G1 + aes(linetype=factor(",input$linetype,"))\n", sep="")}else{""}
+  aesfill = if(input$fill!="None"){paste("G1 = G1 + aes(fill=factor(",input$fill,"))\n", sep="")}else{""}
+  aesshape = if(input$shape!="None"){paste("G1 = G1 + aes(shape=factor(",input$shape,"))\n", sep="")}else{""}
+  aescolor = if(input$color!="None"){paste("G1 = G1 + aes(color=factor(",input$color,"))\n", sep="")}else{""}
   plttext <- switch(chartopt,
           # "Line","Point","Bar","Ribbon","Area","Boxplot","linesummary","geom_smooth", "None"
          Line = paste(aesline,aescolor,scalecolor, 

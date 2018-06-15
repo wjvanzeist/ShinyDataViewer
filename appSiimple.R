@@ -32,6 +32,8 @@ color_decomp <- c("#FFCC00", "#C0504D", "#9BBB59", "#8064A2", "#4BC0C6", "#F7964
 color_sspland1 <- c('#b2df8a','#33a02c','#6a3d9a','#fdbf6f','#ff7f00','#1f78b4','#e31a1c')
 color_sspland2 <- c('#bebada','#fb8072','#8dd3c7','#80b1d3','#ffffb3')
 
+default_file = ""
+
 # Plot presets
 plotpresets <- list(None="",
                     tornado_decomp="G1 = G1 + geom_point()"
@@ -153,7 +155,6 @@ server <- function(input, output, session) {
       fname = paste(datapath,input$dataset,sep="/")
       DATA <- my_dataread(fname)
     } else {
-      print(input$file1)
       DATA <- my_dataread(input$file1[,4], input$file1[,1])
     }
     return(DATA)
@@ -190,7 +191,9 @@ server <- function(input, output, session) {
         if (in_name %like% "Variable" & !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]} 
         if (in_name %like% "Item"& !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]}
         
-        dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
+      #  if (in_name != "value") {
+          dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
+      #  }
     }
     
     dyn_taglist
@@ -321,6 +324,7 @@ server <- function(input, output, session) {
     req(input)
     df <- agmip_csv()
     df <- plot_data_wj(df,input_selection(),input$scaling, input$scalingyr)
+
     return(df)
   })
   
