@@ -18,6 +18,8 @@ library(shiny)
 
 source('./plot_build_simple.R')
 source('./WJlib.R')
+source('./pbl_colors.R')
+allcols = c(hemelblauw3010,hemelblauw3011,hemelblauw3012,hemelblauw3013,hemelblauw3014,hemelblauw3015,hemelblauw3016,hemelblauw3017,hemelblauw3018,hemelblauw3019,mosgroen3020,mosgroen3021,mosgroen3022,mosgroen3023,mosgroen3024,mosgroen3025,mosgroen3026,mosgroen3027,mosgroen3028,mosgroen3029,violet3030,violet3031,violet3032,violet3033,violet3034,violet3035,violet3036,violet3037,violet3038,violet3039,donkergeel3040,donkergeel3041,donkergeel3042,donkergeel3043,donkergeel3044,donkergeel3045,donkergeel3046,donkergeel3047,donkergeel3048,donkergeel3049,paars3050,paars3051,paars3052,paars3053,paars3054,paars3055,paars3056,paars3057,paars3058,paars3059,lichtblauw3060,lichtblauw3061,lichtblauw3062,lichtblauw3063,lichtblauw3064,lichtblauw3065,lichtblauw3066,lichtblauw3067,lichtblauw3068,lichtblauw3069,roze3070,roze3071,roze3072,roze3073,roze3074,roze3075,roze3076,roze3077,roze3078,roze3079,groen3080,groen3081,groen3082,groen3083,groen3084,groen3085,groen3086,groen3087,groen3088,groen3089,rood3090,rood3091,rood3092,rood3093,rood3094,rood3095,rood3096,rood3097,rood3098,rood3099,donkergroen3100,donkergroen3101,donkergroen3102,donkergroen3103,donkergroen3104,donkergroen3105,donkergroen3106,donkergroen3107,donkergroen3108,donkergroen3109,oranje3110,oranje3111,oranje3112,oranje3113,oranje3114,oranje3115,oranje3116,oranje3117,oranje3118,oranje3119,donkerbruin3120,donkerbruin3121,donkerbruin3122,donkerbruin3123,donkerbruin3124,donkerbruin3125,donkerbruin3126,donkerbruin3127,donkerbruin3128,donkerbruin3129,robijnrood3130,robijnrood3131,robijnrood3132,robijnrood3133,robijnrood3134,robijnrood3135,robijnrood3136,robijnrood3137,robijnrood3138,robijnrood3139,bruin3140,bruin3141,bruin3142,bruin3143,bruin3144,bruin3145,bruin3146,bruin3147,bruin3148,bruin3149,mintgroen3150,mintgroen3151,mintgroen3152,mintgroen3153,mintgroen3154,mintgroen3155,mintgroen3156,mintgroen3157,mintgroen3158,mintgroen3159,geel3160,geel3161,geel3162,geel3163,geel3164,geel3165,geel3166,geel3167,geel3168,geel3169,donkerblauw3170,donkerblauw3171,donkerblauw3172,donkerblauw3173,donkerblauw3174,donkerblauw3175,donkerblauw3176,donkerblauw3177,donkerblauw3178,donkerblauw3179,roodgeelgroen3200,roodgeelgroen3201,roodgeelgroen3202,roodgeelgroen3203,roodgeelgroen3204,roodgeelgroen3205,roodgeelgroen3206,roodgeelgroen3207,roodgeelgroen3208,roodgeelgroen3209,roodhemelblauw3300,roodhemelblauw3301,roodhemelblauw3302,roodhemelblauw3303,roodhemelblauw3304,roodhemelblauw3305,roodhemelblauw3306,roodhemelblauw3307,roodhemelblauw3308,roodhemelblauw3309,zwart3400,zwart3401,zwart3402,zwart3403,zwart3404,zwart3405,zwart3406,zwart3407,zwart3408,zwart3409,wit,hemelblauwdonker3610,hemelblauwdonker3611,mosgroendonker3620,mosgroendonker3621,violetdonker3630,violetdonker3631,geeldonker3640,geeldonker3641,groendonker3680,groendonker3681,rooddonker3690,rooddonker3691)
 
 # Initialzing global vars ---------------------------------------------
 if(dir.exists("../data_files")){datapath="../data_files"}else{datapath="./"}
@@ -47,7 +49,7 @@ ui <- function(request) {
     sidebarPanel(width=3,
       tabsetPanel(id="tabs",
          tabPanel("Main", id="Main",
-                  uiOutput("flex_options_chart1"),
+                  uiOutput("flex_options_chart"),
                   selectInput("themeopt", "select theme:", choices=c("theme_bw", "theme_classic", "theme_dark","theme_gray","theme_light","theme_minimal","theme_void", "Other"), selected="theme_classic"),
                   sliderInput('TextSize', 'Text size adjustment', min=-16, max=20, value=0, step=1, round=0)
                   
@@ -64,14 +66,14 @@ ui <- function(request) {
                  #checkboxInput('summary', 'Summary in line chart?', value=FALSE),
                  numericInput('ChartHeight', 'Chart height (pixels)', min=1, max=10000, value=400),
                  numericInput('ChartWidth', 'Chart widht (pixels)', min=1, max=10000, value=500),
-                 checkboxInput('yman', 'Manual y range?'),
+                 checkboxInput('yman', 'Manual y range?', value=FALSE),
                  numericInput("ymin", label = "Minimum y", value = 0),
                  numericInput("ymax", label = "Maximum y", value = 0),
-                 checkboxInput('xman', 'Manual x range?'),
+                 checkboxInput('xman', 'Manual x range?', value=FALSE),
                  numericInput("xmin", label = "Minimum x", value = 2010),
                  numericInput("xmax", label = "Maximum x", value = 2050),
-                 selectInput(paste("scaling"), label = "Scale by", choices=c("None", "Relative", "Absolute")),
-                 numericInput(paste("scalingyr", suffix, sep=""), label = "Scale relative to year", value = 2010, step = 1))
+                 selectInput("scaling", label = "Scale by", choices=c("None", "Relative", "Absolute")),
+                 numericInput("scalingyr", label = "Scale relative to year", value = 2010, step = 1)
         ),
         tabPanel("Colors",
                  selectInput("colour_preset", label = "Select color preset", choices=c("None","SSP", "Decomp", "SSP land 1", "SSP land 2"), selected = "Decomp"),
@@ -86,7 +88,8 @@ ui <- function(request) {
                  colourpicker::colourInput("c9","Pick colour 9", value=rainbow(12)[9]),
                  colourpicker::colourInput("c10","Pick colour 10", value=rainbow(12)[10]),
                  colourpicker::colourInput("c11","Pick colour 11", value=rainbow(12)[11]),
-                 colourpicker::colourInput("c12","Pick colour 12", value=rainbow(12)[12])
+                 colourpicker::colourInput("c12","Pick colour 12", value=rainbow(12)[12]),
+                 colourpicker::colourInput("c13","Pick colour 13", palette = 'limited', allowedCols = allcols)
         )
     )),
     mainPanel(
@@ -125,8 +128,8 @@ ui <- function(request) {
           tabPanel("ggplot code",
                    p(''),
                    selectInput("preset_code",label = "Preset plot", choices = names(plotpresets), selected = plotpresetsdefault),
-                   
-                   textAreaInput("plot_text_add", "Add code lines to plot build function:", value="#G1 = G1 + code to add to the plot", width='600px', height ='200px')
+                   textAreaInput("plot_text_add", "Add code lines to plot build function:", value="#G1 = G1 + code to add to the plot\n", width='600px', height ='200px'),
+                   verbatimTextOutput("coderecycle")
           ),
           selected="Chart"
       )
@@ -168,7 +171,7 @@ server <- function(input, output, session) {
     
     for(i in 1:dim(agmip_csv())[2]) { # looping over column names
       in_name <- colnames(agmip_csv())[i]
-      if (in_name %in% plot_levels()) {
+
         if (is.integer(agmip_csv()[,i])) { #
           in_choices <- c("All",unique(agmip_csv()[,i]))
         } else {
@@ -187,9 +190,7 @@ server <- function(input, output, session) {
         if (in_name %like% "Variable" & !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]} 
         if (in_name %like% "Item"& !("Variable_AgMIP" %in% colnames(agmip_csv()))){in_selected <- levels(agmip_csv()[1,i])[1]}
         
-        new_input <- div(style="line-height: 0.4;", selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
-        dyn_taglist <- tagAppendChild(dyn_taglist, new_input)
-      }
+        dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
     }
     
     dyn_taglist
@@ -203,8 +204,8 @@ server <- function(input, output, session) {
     dyn_taglist <- tagAppendChildren(dyn_taglist,
                        selectInput("x_var", label = "x_axis:", choices = colnames(agmip_csv()),selected = "Year"),
                        selectInput("y_var", label = "y_axis:", choices = colnames(agmip_csv()), selected = if(!("value" %in% colnames(agmip_csv()))){tail(colnames(agmip_csv()),1)}else{c("value")}),
-                       selectInput("Facet", label = "Facet by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
-                       selectInput("Facet2", label = "Facets nr2 by:", choices = c(colnames(agmip_csv()), "None"),selected = "None")
+                       selectInput("facet", label = "Facet by:", choices = c(colnames(agmip_csv()), "None"),selected = "None"),
+                       selectInput("facet2", label = "Facets nr2 by:", choices = c(colnames(agmip_csv()), "None"),selected = "None")
     )
        
     dyn_taglist
@@ -223,19 +224,16 @@ server <- function(input, output, session) {
     dyn_taglist
   })
   
-  flex_options <- function(suffix) {
-    
+  output$flex_options_chart <- renderUI({
     dyn_taglist <- tagList()
     
-    sel = if(suffix==1){"Line"}else{"None"} # setting default
-    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(paste("chart", suffix, sep=""), label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","geom_vline","geom_hline","linesummary","average_line","geom_smooth", "None"), selected = sel))
-    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste('size',suffix,sep=""), 'Size/thickness', value=1.5, step=0.25))
-    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste("dodgewidth", suffix, sep=""), label = "Unstack width bars", value = 0, step=0.1))
-    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput(paste('alpha',suffix,sep=""), 'Alpha', min=0, max=1, value=1, step=0.05))
+    dyn_taglist <- tagAppendChild(dyn_taglist, selectInput("chart", label = "Choose chart type", choices = c("Line","Point","Bar","Ribbon","Area","Boxplot","linesummary","geom_smooth", "None"), selected = "Line"))
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput('size', label = 'Size/thickness', value=1.5, step=0.25))
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput("dodgewidth", label = "Unstack width bars", value = 0, step=0.1))
+    dyn_taglist <- tagAppendChild(dyn_taglist, numericInput('alpha', 'Alpha', min=0, max=1, value=1, step=0.05))
     
-    }
-  
-  output$flex_options_chart1 <- renderUI({flex_options(1)})
+    dyn_taglist
+    })
   
   heightSize <- reactive({
     input$ChartHeight
@@ -310,13 +308,20 @@ server <- function(input, output, session) {
   
   
   # Plot data generation ====
+  input_selection <- reactive({
+    input_sel <- list()
+    for(i in 1:dim(agmip_csv())[2]) { # looping over column names
+      in_name <- colnames(agmip_csv())[i]
+      input_sel[[in_name]] <- input[[in_name]]
+    }
+    return(input_sel)
+  })
+  
   plot_data <- reactive({
-    
     req(input)
     df <- agmip_csv()
-    df <- plot_data_wj(df,input)
+    df <- plot_data_wj(df,input_selection(),input$scaling, input$scalingyr)
     return(df)
-  
   })
   
   #Outputs and rendering --------
@@ -324,31 +329,43 @@ server <- function(input, output, session) {
     
     req(input)
     if (nrow(plot_data())==0){
-      #print("No plot data (yet)")
       return(NULL)
       }
-    #G1 <- plot_build_wj(plot_data(), reactiveValuesToList(input))
+
     df <- plot_data()
-    G1 <- plot_build_wj(df, input)
-    
-    #This adds anything in input$plot_text_add interpreted as parsed formulas
-    
+    G1_text <- plot_build_wj(df, input)
+    eval(parse(text=G1_text))
     eval(parse(text=plotpresets[[input$preset_code]]))
     eval(parse(text=input$plot_text_add))
     
     plot(G1)
-    #save(df, file="shinyplotdata.rda")
 
   }, height=heightSize, width=widthSize)
   
   output$mytable <- renderDataTable({
-    tab <- input$tabs
-    if(substr(tab, 1, 5) == "Chart") {
-      suffix <- as.numeric(substr(tab, nchar(tab), nchar(tab)))
-      plot_subset(plot_data(), suffix, reactiveValuesToList(input))
+    plot_data()
+  })
+  
+  output$coderecycle <- renderText({
+    codetext <- ""
+    codetext <- paste(codetext,"source('./WJlib.R')\n",sep="")
+    codetext <- paste(codetext,"source('./plot_build_simple.R')\n",sep="")
+    codetext <- paste(codetext,"df <- my_dataread('",datapath,input$dataset,"')\n",sep="")
+    codetext <- paste(codetext,"input_sel <- ", paste(deparse(input_selection()), sep="", collapse=""), "\n", sep="")
+    codetext <- paste(codetext,"df <- plot_data_wj(df,input_sel,'", input$scaling,"',", input$scalingyr,")\n",sep="")
+    codetext <- paste(codetext, plot_build_wj(plot_data(), input), sep="\n")
+    codetext <- paste(codetext, plotpresets[[input$preset_code]],
+                      gsub("#G1 \\= G1 \\+ code to add to the plot","",input$plot_text_add), sep="\n")
+    
+    if(input$title==''){
+      plotname <- "plot.png"
     } else {
-      plot_data()
+      plotname <- paste(stringconvert(input$title, ss, input), ".png", sep="")
     }
+    
+    codetext <- paste(codetext, "ggsave('",plotname,"', G1, width=",input$ChartWidth/72,", height=",input$ChartHeight/72,", device='png')\n", sep="")
+    
+    return(codetext)
   })
   
   output$downloadData <- downloadHandler(
@@ -370,7 +387,8 @@ server <- function(input, output, session) {
     },
 
     content = function(file) {
-      G1 <- plot_build_wj(plot_data(), reactiveValuesToList(input))
+      G1_text <- plot_build_wj(plot_data(), reactiveValuesToList(input))
+      eval(parse(text=G1_text))
       eval(parse(text=plotpresets[[input$preset_code]]))
       eval(parse(text=input$plot_text_add))
       ggsave(file, G1, width=input$ChartWidth/72, height=input$ChartHeight/72, device="png")
@@ -449,15 +467,10 @@ server <- function(input, output, session) {
   
   setBookmarkExclude(c("update_settings", "settings_opt"))
   
-  onRestored(function(state) {
-    updateTabsetPanel(session, "tabs", selected="Chart1")
-    updateTabsetPanel(session, "settingstabs", selected="Chart")
-    
-  })
    observe({
      # Trigger this observer every time an input changes
 
-     req(input$chart1)
+     req(input$chart)
      reactiveValuesToList(input)
      
      #print(deparse(scenario_range))
