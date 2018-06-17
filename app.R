@@ -99,7 +99,7 @@ ui <- function(request) {
                 selectInput("scales", label = "Facet scales", choices=c("free_y", "free_x","free", "fixed"), selected = "free")
              ),
               column(4, 
-                     uiOutput("flex_options3")
+                 uiOutput("flex_options3")
             )
            ),
           tabPanel("Table", 
@@ -161,7 +161,12 @@ server <- function(input, output, session) {
         in_choices <- c("All",levels(agmip_csv()[,i]))
       }
       
-      in_selected <- "All" # Default is all
+      if(length(in_choices)<=23){
+        in_selected <- "All" # Default is all unless there are a lot of things
+      } else {
+        in_selected <- in_choices[1]
+        print(in_selected)
+      }
       if (in_name %like% "Region"){
         if ("WLD" %in% in_choices) {
           in_selected <- "WLD"
@@ -175,7 +180,11 @@ server <- function(input, output, session) {
       
       #mym files read as 'dim#' all variables, usally the last one is total or world so a usefull default. Same for Variables ending with T
       if (in_name %like% "dim"){in_selected <- in_choices[length(in_choices)]}
-      if (grepl("T$", in_name)){in_selected <- in_choices[length(in_choices)]}
+      if (in_name == "NRT"){in_selected <- in_choices[length(in_choices)]}
+      if(is.na(in_selected)){
+        in_selected <- in_choices[1]
+      }
+      
       dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
     }
     

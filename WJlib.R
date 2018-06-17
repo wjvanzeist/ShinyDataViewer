@@ -115,6 +115,7 @@ my_dataread <- function(file_list, name_list = FALSE) {
    
     f <- file_list[i]
     fext <- tolower(file_ext(file_list[i])[1])
+    if(fext == "out" |fext == "scn") {image_file<-TRUE}else{image_file<-FALSE}
 
     if (fext == "rda") { 
       DATAtmp <- readRDS(f)
@@ -129,8 +130,10 @@ my_dataread <- function(file_list, name_list = FALSE) {
     
     DATAtmp <- data_cleaner(DATAtmp)
     
+    print(name_list)
+    
     if(filecount>1){
-      if (name_list){
+      if (name_list!=FALSE){
         DATAtmp$file_name <- name_list[i]
       } else {
         DATAtmp$file_name <- f
@@ -140,10 +143,23 @@ my_dataread <- function(file_list, name_list = FALSE) {
       if(i==1){
         DATA <- DATAtmp
       } else {
-        DATA <- rbind(DATA, DATAtmp)
+        if(image_file) {
+          DATA <- rbind.fill(DATA, DATAtmp) #allow nonoverlapping column names
+        } else {
+          DATA <- rbind(DATA, DATAtmp)
+        }
       }
     } else {
       DATA <- DATAtmp
+    }
+    
+    if(image_file){
+      DATA$file_name <- NULL
+    }
+    
+    if("value" %in% colnames(DATA)) { #moving value to the back
+      col_idx <- grep("value", names(DATA))
+      DATA <- DATA[, c((1:ncol(DATA))[-col_idx],col_idx)]
     }
     
   }
