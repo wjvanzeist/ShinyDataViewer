@@ -15,7 +15,7 @@ library(tidyr)
 library(colourpicker)
 library(shiny)
 
-source('./plot_build.R')
+source('./plot_build_simple.R')
 source('./WJlib.R')
 
 # Initialzing global vars ---------------------------------------------
@@ -161,12 +161,13 @@ server <- function(input, output, session) {
         in_choices <- c("All",levels(agmip_csv()[,i]))
       }
       
+
       if(length(in_choices)<=23){
         in_selected <- "All" # Default is all unless there are a lot of things
       } else {
         in_selected <- in_choices[1]
-        print(in_selected)
       }
+
       if (in_name %like% "Region"){
         if ("WLD" %in% in_choices) {
           in_selected <- "WLD"
@@ -184,7 +185,6 @@ server <- function(input, output, session) {
       if(is.na(in_selected)){
         in_selected <- in_choices[1]
       }
-      
       dyn_taglist <- tagAppendChild(dyn_taglist, selectInput(in_name, label=in_name, choices = in_choices, selected = in_selected, multiple = TRUE, selectize = TRUE))
     }
     
