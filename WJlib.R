@@ -130,8 +130,6 @@ my_dataread <- function(file_list, name_list = FALSE) {
     
     DATAtmp <- data_cleaner(DATAtmp)
     
-    print(name_list)
-    
     if(filecount>1){
       if (name_list!=FALSE){
         DATAtmp$file_name <- name_list[i]

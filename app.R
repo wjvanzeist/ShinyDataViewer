@@ -15,7 +15,7 @@ library(tidyr)
 library(colourpicker)
 library(shiny)
 
-source('./plot_build_simple.R')
+source('./plot_build.R')
 source('./WJlib.R')
 
 # Initialzing global vars ---------------------------------------------
